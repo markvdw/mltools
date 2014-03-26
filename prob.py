@@ -27,6 +27,8 @@ class MultivariateNormal(object):
         return mvnpdf_p(X, self.mu, self._iS)
 
     def sample(self, N=1):
+        import warnings
+        warnings.warn("MultivariateNormal.sample: Think I forgot to add the mean in this function!", UserWarning)
         return self._cS.dot(random.randn(self.D, N)).T
 
     @property

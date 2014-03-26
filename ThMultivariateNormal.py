@@ -1,12 +1,16 @@
 ###############################################################################
-# thprob.y
+# ThMultivariateNormal.py
 # Some probability functions used for Machine Learning programming in Python
 # implemented using Theano.
+#
+# Very experimental code. Still figuring out what the best way to do things is.
 #
 # Mark van der Wilk (mv310@cam.ac.uk)
 ###############################################################################
 
 import numpy as np
+import numpy.linalg as linalg
+import numpy.random
 
 from scipy import constants as const
 
@@ -24,6 +28,7 @@ th_prec = sT.matrix_inverse(th_S)
 
 th_d = th_X - th_mu
 
+# log *JOINT* probability
 th_logjp = T.sum(-0.5*th_D*T.log(2*const.pi) +
                 -0.5*T.log(sT.det(th_S)) +
                 -0.5*sT.diag(T.dot(th_d, T.dot(th_prec, th_d.T)))
@@ -50,6 +55,23 @@ dlogjpdf_dmu = theano.function([th_X, th_mu, th_S], th_dlogjpdf_dmu)
 dlogjpdf_dS = theano.function([th_X, th_mu, th_S], th_dlogjpdf_dS)
 dlogjpdf_dX = theano.function([th_X, th_mu, th_S], th_dlogjpdf_dX)
 
+def make_th_mvnlogjpdf(th_X, th_mu, th_prec):
+    '''
+    make_th_mvnlogjpdf
+    Makes a Theano variable that calculates the joint log probability.
+
+    Parameters:
+      th_X    : NxD theano matrix of data to calculate the probability of.
+      th_mu   : D vector, containing the mean.
+      th_prec : DxD precision matrix
+    '''
+    th_D = th_X.shape[1]
+    th_d = th_X - th_mu
+    return T.sum(-0.5*th_D*T.log(2*const.pi) +
+                  0.5*T.log(sT.det(th_prec)) +
+                 -0.5*sT.diag(T.dot(th_d, T.dot(th_prec, th_d.T)))
+                 )
+
 def logjpdf(X, mu, S):
     p = f_logjp(X, mu, S)
     if (p == float('inf')) or (p == float('-inf')):
@@ -73,8 +95,10 @@ class MultivariateNormal(object):
     def jpdf(self, X=None, mu=None, S=None):
         return np.exp(self.logjpdf(X, mu, S))
 
-    def sample(self, X=None, mu=None, S=None):
-        raise NotImplementedError()
+    def sample(self, mu=None, S=None, N=1):
+        _, mu, S = self._replace_none_params(None, mu, S)
+        D = S.shape[0]
+        return mu + linalg.cholesky(S).dot(numpy.random.randn(D, N)).T
 
     def dmu(self, X=None, mu=None, S=None):
         return dlogjpdf_dmu(*self._replace_none_params(X, mu, S))
