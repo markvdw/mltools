@@ -18,6 +18,8 @@ import theano
 import theano.tensor as T
 from theano.sandbox.linalg import ops as sT
 
+import prob as mlprob
+
 th_X = T.matrix('mvnnorm_data')
 th_mu = T.vector('mvnnorm_mu')
 th_S = T.matrix('mvnnorm_sigma')
@@ -83,7 +85,7 @@ def logjpdf(X, mu, S):
 def pdf(X, mu, S):
     return np.exp(logjpdf(X, mu, S))
 
-class MultivariateNormal(object):
+class MultivariateNormal(mlprob.ProbDistBase):
     def __init__(self, X=None, mu=None, S=None):
         self.X = X
         self.mu = mu

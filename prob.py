@@ -12,7 +12,20 @@ import numpy.linalg as linalg
 import numpy.random as random
 from scipy import constants
 
-class MultivariateNormal(object):
+class ProbDistBase(object):
+    def logpdf(self):
+        raise NotImplementedError()
+
+    def logjpdf(self):
+        raise NotImplementedError()
+
+    def pdf(self):
+        raise NotImplementedError()
+
+    def sample(self):
+        raise NotImplementedError()
+
+class MultivariateNormal(ProbDistBase):
     def __init__(self, mu, S):
         self.D = len(mu)
         self.mu = mu
@@ -22,6 +35,9 @@ class MultivariateNormal(object):
 
     def logpdf(self, X):
         return mvnlogpdf_p(X, self.mu, self._iS)
+
+    def logjpdf(self, X):
+        return np.sum(self.logpdf(X))
 
     def pdf(self, X):
         return mvnpdf_p(X, self.mu, self._iS)
@@ -80,7 +96,7 @@ class Interval(object):
     def inside(self, x):
         return (x >= self._lower) and (x <= self.upper)
 
-class MultivariateUniform(object):
+class MultivariateUniform(ProbDistBase):
     def __init__(self, hyper_rectangle):
         """
         MultivariateUniform constructor
