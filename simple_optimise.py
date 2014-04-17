@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 
 def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callback=None, options=None):
@@ -11,7 +13,7 @@ def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callb
                        'verbosity':0,
                        'maxiter':-1,
                        'streak':10,
-                       'momenum':0.0}
+                       'momentum':0.0}
     if (options == None):
         options = options_default
 
@@ -23,16 +25,16 @@ def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callb
     eps = options['max_eps']
     momeps = options['momentum']
 
-    fold = fun(x, **args)
+    fold = fun(x, *args)
     momentum = 0.0
 
     opt_iteration = 0
     streak = 0
     while (opt_iteration != maxiter):
-        grad = jac(x, **args)
+        grad = jac(x, *args)
 
         xprop = x - eps * grad + momentum
-        fprop = fun(xprop, **args)
+        fprop = fun(xprop, *args)
 
         if (fprop < fold):
             x = xprop
@@ -55,8 +57,11 @@ def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callb
                 print('Finished due to tolerance...')
             break
 
-        if (options['verbosity'] >= 2):
+        if (options['verbosity'] >= 3):
             print streak, x, grad, fold, eps
+        elif (options['verbosity'] >= 2):
+            # print streak, fold, eps
+            sys.stdout.write('streak: %i\tfold: %f\teps: %f\t sum(grad**2): %f\r' % (streak, fold, eps, np.sum(grad**2.0)))
 
         if (callback != None):
             callback(x)
