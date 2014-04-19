@@ -13,6 +13,9 @@ import numpy.linalg as linalg
 
 from scipy import stats
 
+import theano
+import theano.tensor as T
+
 import prob as mlprob
 import ThMultivariateNormal as thnorm
 
@@ -78,10 +81,12 @@ class TestSequenceFunctions(unittest.TestCase):
         logpdf = mlprob.mvnlogpdf(X, [0]*D, S)
         pdf = mlprob.mvnpdf(X, [0]*D, S)
 
+        # logpdf vs pdf of mltools
         diff = np.sum(np.absolute(np.exp(logpdf) - pdf)) / len(X)
         self.assertTrue(diff < self.tolerance)
 
-        thlogpdf = thnorm.logpdf(X, [0]*D, S)
+        # mltools vs theano logpdf
+        thlogpdf = thnorm.logjpdf(X, [0]*D, S)
         diff = np.absolute(thlogpdf - np.sum(logpdf)) / len(X)
         self.assertTrue(diff < self.tolerance, "Difference : " + str(diff))
 
@@ -99,7 +104,7 @@ class TestSequenceFunctions(unittest.TestCase):
 
         self.assertTrue(diff < self.tolerance)
 
-        thlogpdf = thnorm.logp_prec(X, [0] * D, linalg.inv(S))
+        thlogpdf = thnorm.logjp_prec(X, [0] * D, linalg.inv(S))
         diff = (np.sum(logpdf) - thlogpdf) / len(X)
 
         self.assertTrue(diff < self.tolerance)
@@ -150,6 +155,27 @@ class TestSequenceFunctions(unittest.TestCase):
         u = mlprob.MultivariateUniform(hr)
         self.assertAlmostEqual(logp, u._ld)
 
+    def test_th_makelogpdf(self):
+        D = 100
+        N = 1000
+
+        X = rnd.randn(N, D)
+        S = rnd.randn(D, D)
+        S = S.dot(S.T)
+        mu = rnd.randn(D)
+        pdf = np.sum(mlprob.mvnlogpdf_p(X, mu, S))
+
+        #make_th_mvnlogjpdf(th_X, th_mu, th_prec):
+        th_X = T.matrix('X')
+        th_mu = T.vector('mu')
+        th_prec = T.matrix('prec')
+        th_logjpdf = thnorm.make_th_mvnlogjpdf(th_X, th_mu, th_prec)
+
+        f = theano.function([th_X, th_mu, th_prec], th_logjpdf)
+        
+        logjpdf = f(X, mu, S)
+
+        self.assertAlmostEqual(logjpdf, pdf)
 
 if args.benchmark:
     print("Benchmarking...")

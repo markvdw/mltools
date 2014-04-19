@@ -13,6 +13,26 @@ import matplotlib as mplot
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+def line_sets_2d(set1, set2):
+    '''
+    line_sets_2d
+    Draw lines between points in two sets (2D).
+    '''
+    plt.plot(np.vstack((set1.T[0, :], set2.T[0, :])), np.vstack((set1.T[1, :], set2.T[1, :])))
+
+def line_sets_3d(ax, set1, set2, opt='r'):
+    '''
+    line_sets_3d
+    Draw lines between points in two sets (3D).
+    '''
+    # ax.plot3D(np.vstack((set1.T[0, :], set2.T[0, :])),
+    #           np.vstack((set1.T[1, :], set2.T[1, :])),
+    #           np.vstack((set1.T[2, :], set2.T[2, :])), 'x')
+    for s1, s2 in zip(set1, set2):
+        plt.plot([s1[0], s2[0]],
+                 [s1[1], s2[1]],
+                 [s1[2], s2[2]], opt)
+
 def auto_axes_robust(ax, datax, datay, prop=0.95, verbose=False):
     '''
     auto_axes_robust
