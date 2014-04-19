@@ -5,9 +5,13 @@
 
 import numpy as np
 import numpy.linalg as linalg
+
 import scipy as sp
+import scipy.constants
+
 import matplotlib as mplot
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 def auto_axes_robust(ax, datax, datay, prop=0.95, verbose=False):
     '''
@@ -107,6 +111,7 @@ if __name__ == "__main__":
     center = [0,0,0]
     x, y, z = GenEllipsoid(A, center)
 
+    plt.show()
     plt.ion()
     fig = plt.figure(2)
     ax = fig.add_subplot(111, projection='3d')

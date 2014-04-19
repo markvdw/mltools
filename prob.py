@@ -27,7 +27,13 @@ class ProbDistBase(object):
 
 class MultivariateNormal(ProbDistBase):
     def __init__(self, mu, S):
-        self.D = len(mu)
+        if type(S) is int:
+            self.D = 1
+            self.S = np.array([[S]])
+        else:
+            S = np.array(S)
+            self.D = S.shape[0]
+
         self.mu = mu
         self._S = S
         self._iS = linalg.inv(S)
@@ -43,9 +49,7 @@ class MultivariateNormal(ProbDistBase):
         return mvnpdf_p(X, self.mu, self._iS)
 
     def sample(self, N=1):
-        import warnings
-        warnings.warn("MultivariateNormal.sample: Think I forgot to add the mean in this function!", UserWarning)
-        return self._cS.dot(random.randn(self.D, N)).T
+        return self._cS.dot(random.randn(self.D, N)).T + self.mu
 
     @property
     def S(self):
