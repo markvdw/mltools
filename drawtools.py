@@ -3,6 +3,8 @@
 # Some drawing tools.
 ###############################################################################
 
+import sys
+
 import numpy as np
 import numpy.linalg as linalg
 
@@ -11,7 +13,57 @@ import scipy.constants
 
 import matplotlib as mplot
 import matplotlib.pyplot as plt
+import matplotlib.animation as anim
 from mpl_toolkits.mplot3d import Axes3D
+
+
+def anim_3dfunc(X0, X1, Y, interval=50):
+    """
+    anim_3dfunc
+    Creates an animated plot where points are plotted. Each *column* is a
+    different time instance.
+    """
+    def get_num(V, num):
+        if V.ndim == 1:
+            v = V
+        else:
+            v = V[:, num]
+        return v
+
+    def update_histu(num, X0, X1, Y, line):
+        x0 = get_num(X0, num)
+        x1 = get_num(X1, num)
+        y = get_num(Y, num)
+
+        line[0].set_data(x0, x1)
+        line[0].set_3d_properties(y)
+        sys.stdout.write('%i   \r' % num)
+        return line
+
+    def clear_histU():
+        ls[0].set_data([], [])
+        ls[0].set_3d_properties([])
+        return ls
+
+    # def clear_histU():
+    #     pass
+
+    maxnum = 1
+    for d in (X0, X1, Y):
+        try:
+            maxnum = max(maxnum, d.shape[1])
+        except:
+            pass
+    print maxnum
+
+    figU = plt.figure()
+    ax = figU.add_subplot(111, projection='3d')
+    ls = ax.plot(get_num(X0, 0), get_num(X1, 0), get_num(Y, 0), 'x')
+    histU_anim = anim.FuncAnimation(figU, update_histu, maxnum, fargs=(X0, X1, Y, ls), interval=interval, blit=False, init_func=clear_histU)
+    plt.show()
+
+    return ax
+
 
 def line_sets_2d(set1, set2):
     '''
@@ -19,6 +71,7 @@ def line_sets_2d(set1, set2):
     Draw lines between points in two sets (2D).
     '''
     plt.plot(np.vstack((set1.T[0, :], set2.T[0, :])), np.vstack((set1.T[1, :], set2.T[1, :])))
+
 
 def line_sets_3d(ax, set1, set2, opt='r'):
     '''
@@ -32,6 +85,7 @@ def line_sets_3d(ax, set1, set2, opt='r'):
         plt.plot([s1[0], s2[0]],
                  [s1[1], s2[1]],
                  [s1[2], s2[2]], opt)
+
 
 def auto_axes_robust(ax, datax, datay, prop=0.95, verbose=False):
     '''
