@@ -25,8 +25,23 @@ class ProbDistBase(object):
     def sample(self):
         raise NotImplementedError()
 
+class DummyImproperUniform(ProbDistBase):
+    """
+    DummyImproperUniform
+    Convenient way to remove the influence of a particular variable from a
+    joint probability calculation.
+    """
+    def logpdf(self, X):
+        return 0.0
+
+    def logjpdf(self, X):
+        return 0.0
+
+    def pdf(self, X):
+        return 1.0
+
 class MultivariateNormal(ProbDistBase):
-    def __init__(self, mu, S):
+    def __init__(self, mu, S, cS=None, iS=None):
         if type(S) is int:
             self.D = 1
             self.S = np.array([[S]])
@@ -36,8 +51,15 @@ class MultivariateNormal(ProbDistBase):
 
         self.mu = mu
         self._S = S
-        self._iS = linalg.inv(S)
-        self._cS = linalg.cholesky(S)
+        if iS is None:
+            self._iS = linalg.inv(S)
+        else:
+            self._iS = iS
+
+        if cS is None:
+            self._cS = linalg.cholesky(S)
+        else:
+            self._cS = cS
 
     def logpdf(self, X):
         return mvnlogpdf_p(X, self.mu, self._iS)
@@ -171,7 +193,7 @@ def mvnlogpdf_p (X, mu, PrecMat):
     Returns:
         Nx1 vector of log probabilities.
     """
-    D = len(mu)
+    D = PrecMat.shape[0]
     X = _check_single_data(X, D)
     N = len(X)
 
@@ -197,7 +219,7 @@ def mvnlogpdf (X, mu, Sigma):
     Returns:
         Nx1 vector of log probabilities.
     """
-    D = len(mu)
+    D = Sigma.shape[0]
     X = _check_single_data(X, D)
     N = len(X)
 

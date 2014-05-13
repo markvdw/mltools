@@ -58,6 +58,9 @@ def anim_3dfunc(X0, X1, Y, interval=50):
 
     figU = plt.figure()
     ax = figU.add_subplot(111, projection='3d')
+    ax.set_xlim(np.min(X0), np.max(X0))
+    ax.set_ylim(np.min(X1), np.max(X1))
+    ax.set_zlim3d(np.min(Y), np.max(Y))
     ls = ax.plot(get_num(X0, 0), get_num(X1, 0), get_num(Y, 0), 'x')
     histU_anim = anim.FuncAnimation(figU, update_histu, maxnum, fargs=(X0, X1, Y, ls), interval=interval, blit=False, init_func=clear_histU)
     plt.show()
@@ -94,6 +97,12 @@ def auto_axes_robust(ax, datax, datay, prop=0.95, verbose=False):
     sure that at most the proportion of the data given by 'prop' is actually
     displayed.
     '''
+
+    if type(datax) is list:
+        datax = np.array(datax)
+    if type(datay) is list:
+        datay = np.array(datay)
+
     def _find_robust_range(data, prop=0.95):
         '''
         _find_robust_range
@@ -108,9 +117,11 @@ def auto_axes_robust(ax, datax, datay, prop=0.95, verbose=False):
 
         return r, np.sum(np.abs(data) < r) / numpoints
 
-    rx, fx = _find_robust_range(datax, prop)
+    if datax is not None:
+        rx, fx = _find_robust_range(datax, prop)
+        ax.set_xlim(-rx, rx)
+
     ry, fy = _find_robust_range(datay, prop)
-    ax.set_xlim(-rx, rx)
     ax.set_ylim(-ry, ry)
 
     if (verbose):
