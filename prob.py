@@ -25,6 +25,9 @@ class ProbDistBase(object):
     def sample(self):
         raise NotImplementedError()
 
+    def entropy(self):
+        raise NotImplementedError()
+
 class DummyImproperUniform(ProbDistBase):
     """
     DummyImproperUniform
@@ -72,6 +75,11 @@ class MultivariateNormal(ProbDistBase):
 
     def sample(self, N=1):
         return self._cS.dot(random.randn(self.D, N)).T + self.mu
+
+    
+    def entropy(self):
+        logdet_cov = 2.0*np.sum(np.log(np.diag(self._cS)))
+        return 0.5 * self.D * (1. + np.log(2*np.pi)) + 0.5 * logdet_cov
 
     @property
     def S(self):
@@ -284,3 +292,10 @@ def mvnpdf (X, mu, Sigma):
         pdf[n] = normconst * np.exp(-0.5 * d.dot(iS.dot(d)))
 
     return pdf
+
+
+def mvn_entropy(mu, Sigma):
+    D = len(mu)
+
+    _, logdet = linalg.slogdet(Sigma)
+    return 0.5*D*(1.+np.log(2*np.pi)) + 0.5*logdet

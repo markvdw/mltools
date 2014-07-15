@@ -33,7 +33,7 @@ class TestSequenceFunctions(unittest.TestCase):
 
     def test_log_1d_eval(self):
         X = rnd.randn(100, 1)
-        logpdf_tools = mlprob.mvnlogpdf(X, [0], [[1]])
+        logpdf_tools = mlprob.mvnlogpdf(X, np.array([0]), np.array([[1]]))
         logpdf_sp = np.log(stats.norm.pdf(X))
 
         diff = np.sum(np.absolute(logpdf_tools - logpdf_sp)) / len(X)
@@ -176,6 +176,23 @@ class TestSequenceFunctions(unittest.TestCase):
         logjpdf = f(X, mu, S)
 
         self.assertAlmostEqual(logjpdf, pdf)
+
+        
+    def test_mvn_entropy(self):
+        D = [1, 2, 5, 10, 20, 50, 100]
+        
+        for d in D:
+            mu = rnd.randn(d)
+            S = rnd.randn(d, d)
+            S = S.dot(S.T)
+            pdf = mlprob.MultivariateNormal(mu, S)
+
+            # Check for consitency
+            self.assertAlmostEqual(pdf.entropy(), mlprob.mvn_entropy(mu, S))
+
+            # Check for similarity to scipy
+            self.assertAlmostEqual(pdf.entropy(), stats.multivariate_normal.entropy(mu, S))
+
 
 if args.benchmark:
     print("Benchmarking...")
