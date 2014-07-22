@@ -2,6 +2,24 @@ import sys
 
 import numpy as np
 
+
+def finite_difference(fun, x0, args=None, d=10**-4):
+    """
+    finite_difference
+    Calculates the finite difference of fun() around x0. fun() can return an
+    array of any dimension.
+    :param fun: Function to calculate the fd of.
+    :param x0: Location around which to calculate fd.
+    :param args: Extra arguments to fun.
+    :param d: Tolerance
+    :return: The finite difference.
+    """
+    if args is None:
+        args = ()
+
+    return (fun(x0 + d, *args) - fun(x0, *args)) / d
+
+
 def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callback=None, options=None):
     if (args == None):
         args = ()
