@@ -1,4 +1,5 @@
 import sys
+import collections
 
 import numpy as np
 
@@ -18,6 +19,30 @@ def finite_difference(fun, x0, args=None, d=10**-4):
         args = ()
 
     return (fun(x0 + d, *args) - fun(x0, *args)) / d
+
+
+def diffstats(fd, cg):
+    """
+    diffstats
+    Returns different measures of the difference between two multidimensional
+    matrices. Made for use with getting an idea what the difference is between
+    a finite difference calculation and a calculated gradient
+    :param fd: Matrix A
+    :param cg: Matrix B
+    :return:
+    """
+    percent_diff = np.nanmax(np.abs((fd - cg) / fd)*100.)
+    max_diff = np.max(np.abs(fd - cg))
+
+    DiffStats = collections.namedtuple("DiffStats", "diff_max percent_max")
+
+    return DiffStats(diff_max=max_diff, percent_max=percent_diff)
+
+def print_diffstats(d, diff_max=True, percent_max=True):
+    if diff_max:
+        print "Maximum difference           : %e" % d.diff_max
+    if percent_max:
+        print "Maximum percentage difference: %f" % d.percent_max
 
 
 def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callback=None, options=None):
