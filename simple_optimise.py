@@ -19,12 +19,11 @@ def finite_difference(fun, x0, args=None, d=10**-4):
         args = ()
 
     if isinstance(x0, np.ndarray):
+        f0 = fun(x0, *args)
         result_shape = fun(x0).shape
 
         fd = np.zeros(x0.shape + result_shape)
-
         for idx in np.ndindex(fd.shape[:len(x0.shape)]):
-            f0 = fun(x0, *args)
             x0[idx] += d
             f1 = fun(x0, *args)
             x0[idx] -= d
@@ -45,18 +44,23 @@ def diffstats(fd, cg):
     :param cg: Matrix B
     :return:
     """
-    percent_diff = np.nanmax(np.abs((fd - cg) / fd)*100.)
+    pd = np.abs((fd - cg) / fd) * 100.
+
+    percent_diff = np.nanmax(pd)
     max_diff = np.max(np.abs(fd - cg))
+    loc_percent_max = np.unravel_index(np.nanargmax(pd), pd.shape)
 
-    DiffStats = collections.namedtuple("DiffStats", "diff_max percent_max")
+    DiffStats = collections.namedtuple("DiffStats", "diff_max percent_max loc_percent_max")
 
-    return DiffStats(diff_max=max_diff, percent_max=percent_diff)
+    return DiffStats(diff_max=max_diff, percent_max=percent_diff, loc_percent_max=loc_percent_max)
 
-def print_diffstats(d, diff_max=True, percent_max=True):
+def print_diffstats(d, diff_max=True, percent_max=True, loc_percent_max=True):
     if diff_max:
         print "Maximum difference           : %e" % d.diff_max
     if percent_max:
         print "Maximum percentage difference: %f" % d.percent_max
+    if loc_percent_max:
+        print "Location of max pd           : " + str(d.loc_percent_max)
 
 
 def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callback=None, options=None):
