@@ -8,7 +8,7 @@ def finite_difference(fun, x0, args=None, d=10**-4):
     """
     finite_difference
     Calculates the finite difference of fun() around x0. fun() can return an
-    array of any dimension.
+    array of any dimension. Input/parameter can also be of any dimension.
     :param fun: Function to calculate the fd of.
     :param x0: Location around which to calculate fd.
     :param args: Extra arguments to fun.
@@ -18,7 +18,23 @@ def finite_difference(fun, x0, args=None, d=10**-4):
     if args is None:
         args = ()
 
-    return (fun(x0 + d, *args) - fun(x0, *args)) / d
+    if isinstance(x0, np.ndarray):
+        result_shape = fun(x0).shape
+
+        fd = np.zeros(x0.shape + result_shape)
+
+        i = np.indices(x0.shape)
+        indices = np.transpose(np.asarray([x.flatten() for x in i]))
+        for idx in np.ndindex(fd.shape[:len(x0.shape)]):
+            f0 = fun(x0, *args)
+            x0[idx] += d
+            f1 = fun(x0, *args)
+            x0[idx] -= d
+            fd[idx] = (f1 - f0) / d
+
+        return fd
+    else:
+        return (fun(x0 + d, *args) - fun(x0, *args)) / d
 
 
 def diffstats(fd, cg):
