@@ -23,8 +23,6 @@ def finite_difference(fun, x0, args=None, d=10**-4):
 
         fd = np.zeros(x0.shape + result_shape)
 
-        i = np.indices(x0.shape)
-        indices = np.transpose(np.asarray([x.flatten() for x in i]))
         for idx in np.ndindex(fd.shape[:len(x0.shape)]):
             f0 = fun(x0, *args)
             x0[idx] += d
