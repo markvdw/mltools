@@ -20,7 +20,7 @@ def finite_difference(fun, x0, args=None, d=10**-4):
 
     if isinstance(x0, np.ndarray):
         f0 = fun(x0, *args)
-        result_shape = fun(x0).shape
+        result_shape = f0.shape
 
         fd = np.zeros(x0.shape + result_shape)
         for idx in np.ndindex(fd.shape[:len(x0.shape)]):
