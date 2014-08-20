@@ -3,6 +3,71 @@ import collections
 
 import numpy as np
 
+import matplotlib.pyplot as plt
+
+
+def fd_sensitivity_struct(fun, struct, changevar, cg, fun_args=None, drange=(-12, 0), n=60, plot_all=False):
+    if fun_args is None:
+        fun_args = ()
+
+    dl = np.logspace(drange[0], drange[1], n)
+    fdl = []
+    for d in dl:
+        fdl.append(finite_difference_struct(fun, struct, changevar, fun_args, d=d).flatten())
+        sys.stdout.write('.')
+
+    _plot_sensitivity(dl, fdl, cg, plot_all)
+
+    return dl, fdl, cg
+
+
+def fd_sensitivity(fun, x0, cg, args=None, drange=(-12, 0), n=60, plot_all=False):
+    if args is None:
+        args = ()
+
+    dl = np.logspace(drange[0], drange[1], n)
+    fdl = []
+    for d in dl:
+        fdl.append(finite_difference(fun, x0, args=args, d=d).flatten())
+        sys.stdout.write('.')
+
+    _plot_sensitivity(dl, fdl, cg, plot_all)
+
+    return dl, fdl, cg
+
+
+def _plot_sensitivity(dl, fdl, cg, plot_all=False):
+    fdl = np.array(fdl) / cg.flatten()
+
+    if plot_all:
+        plt.semilogx(dl, fdl)
+    else:
+        plt.semilogx(dl, np.nanmin(fdl, 1), dl, np.nanmax(fdl, 1))
+
+    # plt.semilogx(dl, [1.05] * len(dl))
+    # plt.semilogx(dl, [0.95] * len(dl))
+    plt.fill_between(dl, [1.05] * len(dl), [0.95] * len(dl), alpha=0.05)
+    plt.fill_between(dl, [1.01] * len(dl), [0.99] * len(dl), alpha=0.15)
+
+    plt.ylabel('estimated gradient')
+    plt.xlabel('finite difference delta')
+    plt.title('Sensitivity of finite difference')
+    plt.ylim(0, 5)
+
+    plt.grid()
+
+
+def finite_difference_struct(fun, struct, changevar, fun_args=None, d=10**-4):
+    if fun_args is None:
+        fun_args = ()
+
+    def wrapper(x, *args):
+        changevar[:] = x
+        return fun(struct, *args)
+
+    x0 = changevar + 0
+    return finite_difference(wrapper, x0, fun_args, d)
+
 
 def finite_difference(fun, x0, args=None, d=10**-4):
     """
@@ -54,13 +119,14 @@ def diffstats(fd, cg):
 
     return DiffStats(diff_max=max_diff, percent_max=percent_diff, loc_percent_max=loc_percent_max)
 
-def print_diffstats(d, diff_max=True, percent_max=True, loc_percent_max=True):
+
+def print_diffstats(diffstats, diff_max=True, percent_max=True, loc_percent_max=True):
     if diff_max:
-        print "Maximum difference           : %e" % d.diff_max
+        print "Maximum difference           : %e" % diffstats.diff_max
     if percent_max:
-        print "Maximum percentage difference: %f" % d.percent_max
+        print "Maximum percentage difference: %f" % diffstats.percent_max
     if loc_percent_max:
-        print "Location of max pd           : " + str(d.loc_percent_max)
+        print "Location of max pd           : " + str(diffstats.loc_percent_max)
 
 
 def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callback=None, options=None):
