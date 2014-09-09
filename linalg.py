@@ -10,6 +10,16 @@ import math
 
 import numpy as np
 
+
+def check_sym(mat):
+    if np.all(mat == mat.T):
+        print("Completely symmetric!")
+    else:
+        pd = (mat - mat.T) / mat * 100
+        print("Maximum pd: %f" % np.nanmax(pd))
+        print("Average pd: %f" % np.nanmean(pd))
+
+
 def rotmat(rot_ax,theta):
     '''
     rotmat

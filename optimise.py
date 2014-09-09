@@ -66,7 +66,14 @@ def finite_difference_struct(fun, struct, changevar, fun_args=None, d=10**-4):
         return fun(struct, *args)
 
     x0 = changevar + 0
-    return finite_difference(wrapper, x0, fun_args, d)
+    fd = finite_difference(wrapper, x0, fun_args, d)
+    changevar[:] = x0
+    return fd
+
+
+def grad_pd(cg, fd):
+    pd = (cg - fd) / fd * 100.
+
 
 
 def finite_difference(fun, x0, args=None, d=10**-4):
@@ -114,19 +121,22 @@ def diffstats(fd, cg):
     percent_diff = np.nanmax(pd)
     max_diff = np.max(np.abs(fd - cg))
     loc_percent_max = np.unravel_index(np.nanargmax(pd), pd.shape)
+    percent_diff_axis = np.nanmax(pd, 0)
 
-    DiffStats = collections.namedtuple("DiffStats", "diff_max percent_max loc_percent_max")
+    DiffStats = collections.namedtuple("DiffStats", "diff_max percent_max loc_percent_max percent_diff_axis")
 
-    return DiffStats(diff_max=max_diff, percent_max=percent_diff, loc_percent_max=loc_percent_max)
+    return DiffStats(diff_max=max_diff, percent_max=percent_diff, loc_percent_max=loc_percent_max, percent_diff_axis=percent_diff_axis)
 
 
-def print_diffstats(diffstats, diff_max=True, percent_max=True, loc_percent_max=True):
+def print_diffstats(diffstats, diff_max=True, percent_max=True, loc_percent_max=True, pd_axis=False):
     if diff_max:
         print "Maximum difference           : %e" % diffstats.diff_max
     if percent_max:
         print "Maximum percentage difference: %f" % diffstats.percent_max
     if loc_percent_max:
         print "Location of max pd           : " + str(diffstats.loc_percent_max)
+    if pd_axis:
+        print "pd_axis                      : " + str(diffstats.percent_diff_axis)
 
 
 def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callback=None, options=None):
