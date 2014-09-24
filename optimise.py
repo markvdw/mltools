@@ -123,9 +123,13 @@ def diffstats(fd, cg):
     loc_percent_max = np.unravel_index(np.nanargmax(pd), pd.shape)
     percent_diff_axis = np.nanmax(pd, 0)
 
-    DiffStats = collections.namedtuple("DiffStats", "diff_max percent_max loc_percent_max percent_diff_axis")
+    DiffStats = collections.namedtuple("DiffStats", "diff_max percent_max loc_percent_max percent_diff_axis pd")
 
-    return DiffStats(diff_max=max_diff, percent_max=percent_diff, loc_percent_max=loc_percent_max, percent_diff_axis=percent_diff_axis)
+    return DiffStats(diff_max=max_diff,
+                     percent_max=percent_diff,
+                     loc_percent_max=loc_percent_max,
+                     percent_diff_axis=percent_diff_axis,
+                     pd=pd)
 
 
 def print_diffstats(diffstats, diff_max=True, percent_max=True, loc_percent_max=True, pd_axis=False):
@@ -134,24 +138,26 @@ def print_diffstats(diffstats, diff_max=True, percent_max=True, loc_percent_max=
     if percent_max:
         print "Maximum percentage difference: %f" % diffstats.percent_max
     if loc_percent_max:
+        print "Gradient shape               : " + str(diffstats.pd.shape)
         print "Location of max pd           : " + str(diffstats.loc_percent_max)
     if pd_axis:
         print "pd_axis                      : " + str(diffstats.percent_diff_axis)
 
 
 def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callback=None, options=None):
-    if (args == None):
+    if args is None:
         args = ()
 
-    if (jac == None):
+    if jac is None:
         raise ValueError('Must supply a value for the Jacobian (gradient)')
 
-    options_default = {'max_eps':0.1,
-                       'verbosity':0,
-                       'maxiter':-1,
-                       'streak':10,
-                       'momentum':0.0}
-    if (options == None):
+    options_default = {'max_eps': .1,
+                       'verbosity' :0,
+                       'maxiter': -1,
+                       'streak': 10,
+                       'momentum': 0.0}
+
+    if options is None:
         options = options_default
 
     for defkey in options_default:

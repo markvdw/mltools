@@ -15,6 +15,16 @@ import matplotlib as mplot
 import matplotlib.pyplot as plt
 import matplotlib.animation as anim
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.backends.backend_pdf import PdfPages
+
+
+def figs_to_pdf(path, figlist):
+    pdf = PdfPages(path)
+
+    for f in figlist:
+        pdf.savefig(f)
+
+    pdf.close()
 
 
 def anim_3dfunc(X0, X1, Y, interval=50):
