@@ -168,7 +168,7 @@ def GenEllipsoid(A, c=[0,0,0], divs=100):
     return (x, y, z)
 
 
-def DrawCovarianceContour (ax, A, c=[0,0]):
+def DrawCovarianceContour(ax, A, c=[0,0]):
     """
     Draw an ellipse for a Gaussian with *precision* matrix A.
 
@@ -186,6 +186,15 @@ def DrawCovarianceContour (ax, A, c=[0,0]):
     ell.set_facecolor([1, 1, 1])
 
     ax.add_artist(ell)
+
+
+def plot_3d_points(P, ax=None):
+    if ax is None:
+        fig = plt.gcf()
+        ax = fig.add_subplot(111, projection='3d')
+    ax.plot(P[:, 0], P[:, 1], P[:, 2], 'x')
+
+    return ax
 
 
 if __name__ == "__main__":

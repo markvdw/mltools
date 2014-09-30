@@ -8,6 +8,7 @@
 # I need a viewer which allows me to sort and group by parameter settings.
 
 import datetime
+import shutil
 import os
 
 import drawtools as mldraw
@@ -17,6 +18,7 @@ class ExperimentBase(object):
     def __init__(self):
         self._time_str = str(datetime.datetime.now()).replace(' ', '_')
         self._savedir = None
+        self.figlist = []
 
     def savefigs(self, filename="figs.pdf"):
         path = self.savedir + filename
@@ -24,6 +26,12 @@ class ExperimentBase(object):
         if not os.path.exists(self.savedir):
             os.mkdir(self.savedir)
         mldraw.figs_to_pdf(path, self.figlist)
+
+    def save_terminal_output(self, logger):
+        if not os.path.exists(self.savedir):
+            os.mkdir(self.savedir)
+        logger.logflush()
+        shutil.copy(logger.filepath, self.savedir + 'log.txt')
 
     @property
     def savedir(self):
