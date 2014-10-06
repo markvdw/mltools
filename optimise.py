@@ -1,9 +1,72 @@
 import sys
 import collections
+import time
 
 import numpy as np
 
 import matplotlib.pyplot as plt
+
+
+class optimisation_history (object):
+    def __init__(self, func, grad, print_gap=1.0, print_growth=1.2, print_max=100):
+        self.func = func
+        self.grad = grad
+        self.init_print_gap = print_gap
+        self.print_growth = print_growth
+        self.print_max = print_max
+
+        self.i = 0
+        self.nexti = self.init_print_gap
+        self.print_gap = self.init_print_gap
+        self.last_time = time.time()
+
+        self.hist = []
+
+    def iteration(self, f):
+        self.hist.append(f)
+        self.i += 1
+
+        if self.i == int(self.nexti):
+            cur_time = time.time()
+            time_per_iter = int(self.print_gap) / (cur_time - self.last_time)
+
+            fval = self.func(f)
+            gval = self.grad(f)
+            # print "%i\t%e\t%e\t%f" % (self.i, fval, np.sum(gval ** 2.0), time_per_iter)
+            sys.stdout.write("%i\t%e\t%e\t%f\r" % (self.i, fval, np.sum(gval ** 2.0), time_per_iter))
+
+            self.print_gap = min(self.print_growth * self.print_gap, self.print_max)
+            self.nexti += int(self.print_gap)
+            self.last_time = cur_time
+        else:
+            sys.stdout.write("%i\r" % self.i)
+            sys.stdout.flush()
+
+    def reset(self):
+        self.i = 0
+        self.nexti = self.init_print_gap
+        self.print_gap = self.init_print_gap
+        self.hist = []
+
+        self.resume()
+
+    def resume(self):
+        self.last_time = time.time()
+        print("Iter\tfunc\t\tgrad\t\titer/s")
+
+    def plot_f_hist(self, start_iter=0):
+        func_hist = []
+        for f in self.hist:
+            func_hist.append(self.func(f))
+
+        iters = np.arange(start_iter, start_iter + len(func_hist))
+
+        # plt.plot(iters, func_hist)
+        plt.plot(iters, func_hist, 'x')
+        plt.xlabel('Iteration')
+        plt.ylabel('Function value')
+
+        return len(func_hist) + start_iter
 
 
 def fd_sensitivity_struct(fun, struct, changevar, cg, fun_args=None, drange=(-12, 0), n=60, plot_all=False):
@@ -204,7 +267,7 @@ def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callb
             print streak, x, grad, fold, eps
         elif (options['verbosity'] >= 2):
             # print streak, fold, eps
-            sys.stdout.write('streak: %i\tfold: %f\teps: %f\t sum(grad**2): %f\r' % (streak, fold, eps, np.sum(grad**2.0)))
+            sys.stdout.write('streak: %i\tfold: %e\teps: %e\t sum(grad**2): %e\r' % (streak, fold, eps, np.sum(grad**2.0)))
 
         if (callback != None):
             callback(x)
