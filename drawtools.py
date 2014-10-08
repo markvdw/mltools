@@ -18,6 +18,24 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.backends.backend_pdf import PdfPages
 
 
+def equalise_axes(*figlist):
+    axis_lims = []
+    ax = []
+    for fig in figlist:
+        ax.append(fig.gca())
+        axis_lims.append(ax[-1].axis())
+
+    axis_lims = np.array(axis_lims).T
+
+    new_axis = (np.min(axis_lims[0]),
+                np.max(axis_lims[1]),
+                np.min(axis_lims[2]),
+                np.max(axis_lims[3]))
+
+    for a in ax:
+        a.axis(new_axis)
+
+
 def figs_to_pdf(path, figlist):
     pdf = PdfPages(path)
 
