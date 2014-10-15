@@ -206,6 +206,21 @@ def DrawCovarianceContour(ax, A, c=[0,0]):
     ax.add_artist(ell)
 
 
+def DrawCovarianceEllipse(A, c=[0, 0, 0], ax=None):
+    """
+    DrawCovarianceEllipse
+    A is *precision* matrix.
+    """
+
+    x, y, z = GenEllipsoid(A, c)
+    if ax is None:
+        fig = plt.gcf()
+        ax = fig.add_subplot(111, projection='3d')
+    wframe = ax.plot_wireframe(x, y, z, rstride=4, cstride=4, color='b', alpha=0.2)
+
+    return ax
+
+
 def plot_3d_points(P, ax=None):
     if ax is None:
         fig = plt.gcf()
