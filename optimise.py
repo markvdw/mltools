@@ -236,40 +236,45 @@ def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callb
 
     opt_iteration = 0
     streak = 0
-    while (opt_iteration != maxiter):
-        grad = jac(x, *args)
+    moved = True
+    while opt_iteration != maxiter:
+        if moved:
+            grad = jac(x, *args)
 
         xprop = x - eps * grad + momentum
         fprop = fun(xprop, *args)
 
-        if (fprop < fold):
+        if fprop < fold:
             x = xprop
             fold = fprop
             streak += 1
 
             momentum = momentum + momeps * - eps * grad
 
-            if (streak >= options['streak']):
+            if streak >= options['streak']:
                 eps *= 2.0
                 eps = min(eps, options['max_eps'])
+
+            moved = True
         else:
             streak = 0
             momentum = 0.0
             eps /= 2.0
+            moved = False
 
         # Termination condition
-        if (np.sum(grad ** 2) < tol):
-            if (options['verbosity'] >= 1):
+        if np.sum(grad ** 2) < tol:
+            if options['verbosity'] >= 1:
                 print('Finished due to tolerance...')
             break
 
-        if (options['verbosity'] >= 3):
+        if options['verbosity'] >= 3:
             print streak, x, grad, fold, eps
-        elif (options['verbosity'] >= 2):
+        elif options['verbosity'] >= 2:
             # print streak, fold, eps
             sys.stdout.write('streak: %i\tfold: %e\teps: %e\t sum(grad**2): %e\r' % (streak, fold, eps, np.sum(grad**2.0)))
 
-        if (callback != None):
+        if callback != None:
             callback(x)
 
         opt_iteration += 1

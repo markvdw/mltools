@@ -221,11 +221,11 @@ def DrawCovarianceEllipse(A, c=[0, 0, 0], ax=None):
     return ax
 
 
-def plot_3d_points(P, ax=None):
+def plot_3d_points(P, ax=None, marker='x'):
     if ax is None:
         fig = plt.gcf()
         ax = fig.add_subplot(111, projection='3d')
-    ax.plot(P[:, 0], P[:, 1], P[:, 2], 'x')
+    ax.plot(P[:, 0], P[:, 1], P[:, 2], marker)
 
     return ax
 
