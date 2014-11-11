@@ -54,7 +54,7 @@ class optimisation_history (object):
         self.last_time = time.time()
         print("Iter\tfunc\t\tgrad\t\titer/s")
 
-    def plot_f_hist(self, start_iter=0):
+    def plot_f_hist(self, start_iter=0, plot_log=False):
         func_hist = []
         for f in self.hist:
             func_hist.append(self.func(f))
@@ -62,7 +62,10 @@ class optimisation_history (object):
         iters = np.arange(start_iter, start_iter + len(func_hist))
 
         # plt.plot(iters, func_hist)
-        plt.plot(iters, func_hist, 'x')
+        if plot_log:
+            plt.plot(iters, np.log10(func_hist), 'x')
+        else:
+            plt.plot(iters, func_hist, 'x')
         plt.xlabel('Iteration')
         plt.ylabel('Function value')
 
