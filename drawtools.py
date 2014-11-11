@@ -14,8 +14,34 @@ import scipy.constants
 import matplotlib as mplot
 import matplotlib.pyplot as plt
 import matplotlib.animation as anim
+from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d import proj3d
 from matplotlib.backends.backend_pdf import PdfPages
+
+
+class Arrow3D(FancyArrowPatch):
+    def __init__(self, xs, ys, zs, *args, **kwargs):
+        FancyArrowPatch.__init__(self, (0,0), (0,0), *args, **kwargs)
+        self._verts3d = xs, ys, zs
+
+    @classmethod
+    def from_vector(cls, v, *args, **kwargs):
+        return cls([0, v[0]], [0, v[1]], [0, v[2]], *args, **kwargs)
+
+    @classmethod
+    def from_vectors(cls, vecs, *args, **kwargs):
+        l = []
+        for v in vecs:
+            l.append(cls([0, v[0]], [0, v[1]], [0, v[2]], *args, **kwargs))
+
+        return l
+
+    def draw(self, renderer):
+        xs3d, ys3d, zs3d = self._verts3d
+        xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
+        self.set_positions((xs[0],ys[0]),(xs[1],ys[1]))
+        FancyArrowPatch.draw(self, renderer)
 
 
 def equalise_axes(*figlist):
