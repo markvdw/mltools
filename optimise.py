@@ -54,8 +54,10 @@ class optimisation_history (object):
         self.last_time = time.time()
         print("Iter\tfunc\t\tgrad\t\titer/s")
 
-    def plot_f_hist(self, start_iter=0, plot_log=False):
+    def plot_f_hist(self, start_iter=0, plot_log=False, start_f=1):
         func_hist = []
+        # We only store the parameters at each iteration, not the actual objective function value. So now we need to
+        # recompute it.
         for f in self.hist:
             func_hist.append(self.func(f))
 
@@ -63,7 +65,10 @@ class optimisation_history (object):
 
         # plt.plot(iters, func_hist)
         if plot_log:
-            plt.plot(iters, np.log10(func_hist), 'x')
+            plt.plot(iters, func_hist / start_f, 'x')
+            ax = plt.gca()
+            ax.set_xscale('log')
+            ax.set_yscale('log')
         else:
             plt.plot(iters, func_hist, 'x')
         plt.xlabel('Iteration')
