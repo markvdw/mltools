@@ -33,6 +33,15 @@ class ExperimentBase(object):
         logger.logflush()
         shutil.copy(logger.filepath, self.savedir + 'log.txt')
 
+    def save(self):
+        # Just save the parameters
+        f = open(self.savedir + "params.txt", 'w')
+        for k, v in self.params.iteritems():
+            f.write(str(k) + '\t' + str(v))
+            f.write('\n')
+
+        f.close()
+
     @property
     def savedir(self):
         if self._savedir is None:

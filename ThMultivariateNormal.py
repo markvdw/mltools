@@ -16,7 +16,8 @@ from scipy import constants as const
 
 import theano
 import theano.tensor as T
-from theano.sandbox.linalg import ops as sT
+import theano.tensor.nlinalg as nlinalg
+import theano.tensor.slinalg as slinalg
 
 import prob as mlprob
 
@@ -26,24 +27,24 @@ th_S = T.matrix('mvnnorm_sigma')
 th_D = th_X.shape[1]
 th_N = th_X.shape[0]
 
-th_prec = sT.matrix_inverse(th_S)
+th_prec = nlinalg.matrix_inverse(th_S)
 
 th_d = th_X - th_mu
 
 # log *JOINT* probability
 th_logjp = T.sum(-0.5*th_D*T.log(2*const.pi) +
-                -0.5*T.log(sT.det(th_S)) +
-                -0.5*sT.diag(T.dot(th_d, T.dot(th_prec, th_d.T)))
+                -0.5*T.log(nlinalg.det(th_S)) +
+                -0.5*nlinalg.diag(T.dot(th_d, T.dot(th_prec, th_d.T)))
                 )
 
 th_logjp_stable = T.sum(-0.5*th_D*T.log(2*const.pi) +
-                       -T.sum(T.log(sT.diag(sT.cholesky(th_S)))) +
-                       -0.5*sT.diag(T.dot(th_d, T.dot(th_prec, th_d.T)))
+                       -T.sum(T.log(nlinalg.diag(slinalg.cholesky(th_S)))) +
+                       -0.5*nlinalg.diag(T.dot(th_d, T.dot(th_prec, th_d.T)))
                        )
 
 th_logjp_prec = T.sum(-0.5*th_D*T.log(2*const.pi) +
-                      0.5*T.log(sT.det(th_prec)) +
-                     -0.5*sT.diag(T.dot(th_d, T.dot(th_prec, th_d.T))))
+                      0.5*T.log(nlinalg.det(th_prec)) +
+                     -0.5*nlinalg.diag(T.dot(th_d, T.dot(th_prec, th_d.T))))
 
 f_logjp = theano.function([th_X, th_mu, th_S], th_logjp)
 f_logjp_stable = theano.function([th_X, th_mu, th_S], th_logjp_stable)
@@ -70,8 +71,8 @@ def make_th_mvnlogjpdf(th_X, th_mu, th_prec):
     th_D = th_X.shape[1]
     th_d = th_X - th_mu
     return T.sum(-0.5*th_D*T.log(2*const.pi) +
-                  0.5*T.log(sT.det(th_prec)) +
-                 -0.5*sT.diag(T.dot(th_d, T.dot(th_prec, th_d.T)))
+                  0.5*T.log(nlinalg.det(th_prec)) +
+                 -0.5*nlinalg.diag(T.dot(th_d, T.dot(th_prec, th_d.T)))
                  )
 
 def logjpdf(X, mu, S):
