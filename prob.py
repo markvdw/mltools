@@ -88,8 +88,8 @@ class MultivariateNormal(ProbDistBase):
     @S.setter
     def S(self, value):
         self._S = value
-        self._cS = linalg.cholesky(S)
-        self._iS = linalg.inv(S)
+        self._cS = linalg.cholesky(value)
+        self._iS = linalg.inv(value)
 
 class Interval(object):
     def __init__(self, lower=0.0, upper=0.0):
