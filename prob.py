@@ -11,6 +11,7 @@ import numpy as np
 import numpy.linalg as linalg
 import numpy.random as random
 from scipy import constants
+from scipy.special import erf
 
 class ProbDistBase(object):
     def logpdf(self):
@@ -292,6 +293,14 @@ def mvnpdf (X, mu, Sigma):
         pdf[n] = normconst * np.exp(-0.5 * d.dot(iS.dot(d)))
 
     return pdf
+
+
+def phi (z):
+    """
+    phi
+    Calculate the univariate normal cumulative density function.
+    """
+    return 0.5 * (1 + erf(z / 2**0.5))
 
 
 def mvn_entropy(mu, Sigma):

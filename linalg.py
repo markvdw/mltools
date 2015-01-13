@@ -10,6 +10,26 @@ import math
 
 import numpy as np
 
+import scipy.linalg as linalg
+
+
+def jit_chol(mat):
+    try:
+        return linalg.cholesky(mat, lower=True)
+    except linalg.LinAlgError:
+        I = np.eye(mat.shape[0])
+        epsarr = np.logspace(-10, 0, 11)
+        for eps in epsarr:
+            print "Trying %e" % eps
+            try:
+                result = linalg.cholesky(mat + eps * I, lower=True)
+                print "It worked!"
+                return result
+            except linalg.LinAlgError:
+                # Go to the next iteration...
+                pass
+        raise linalg.LinAlgError("Matrix not posdef, even with jitter")
+
 
 def check_sym(mat):
     if np.all(mat == mat.T):
