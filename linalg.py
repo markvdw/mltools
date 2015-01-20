@@ -13,17 +13,19 @@ import numpy as np
 import scipy.linalg as linalg
 
 
-def jit_chol(mat):
+def jit_chol(mat, verbose=False):
     try:
         return linalg.cholesky(mat, lower=True)
     except linalg.LinAlgError:
         I = np.eye(mat.shape[0])
         epsarr = np.logspace(-10, 0, 11)
         for eps in epsarr:
-            print "Trying %e" % eps
+            if verbose:
+                print "Trying %e" % eps
             try:
                 result = linalg.cholesky(mat + eps * I, lower=True)
-                print "It worked!"
+                if verbose: 
+                    print "It worked!"
                 return result
             except linalg.LinAlgError:
                 # Go to the next iteration...

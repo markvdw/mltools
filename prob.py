@@ -13,6 +13,8 @@ import numpy.random as random
 from scipy import constants
 from scipy.special import erf
 
+import linalg as mlin
+
 class ProbDistBase(object):
     def logpdf(self):
         raise NotImplementedError()
@@ -45,7 +47,7 @@ class DummyImproperUniform(ProbDistBase):
         return 1.0
 
 class MultivariateNormal(ProbDistBase):
-    def __init__(self, mu, S, cS=None, iS=None):
+    def __init__(self, mu, S, cS=None, iS=None, jitchol=False):
         if type(S) is int:
             self.D = 1
             self.S = np.array([[S]])
@@ -61,7 +63,10 @@ class MultivariateNormal(ProbDistBase):
             self._iS = iS
 
         if cS is None:
-            self._cS = linalg.cholesky(S)
+            if jitchol:
+                self._cS = mlin.jit_chol(S)
+            else:
+                self._cS = linalg.cholesky(S)
         else:
             self._cS = cS
 
