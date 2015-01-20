@@ -48,25 +48,24 @@ class DummyImproperUniform(ProbDistBase):
 
 class MultivariateNormal(ProbDistBase):
     def __init__(self, mu, S, cS=None, iS=None, jitchol=False):
-        if type(S) is int:
+        if (type(S) is int) or (type(S) is float):
             self.D = 1
             self.S = np.array([[S]])
         else:
-            S = np.array(S)
+            self.S = np.array(S)
             self.D = S.shape[0]
 
         self.mu = mu
-        self._S = S
         if iS is None:
-            self._iS = linalg.inv(S)
+            self._iS = linalg.inv(self.S)
         else:
             self._iS = iS
 
         if cS is None:
             if jitchol:
-                self._cS = mlin.jit_chol(S)
+                self._cS = mlin.jit_chol(5)
             else:
-                self._cS = linalg.cholesky(S)
+                self._cS = linalg.cholesky(self.S)
         else:
             self._cS = cS
 
@@ -94,8 +93,8 @@ class MultivariateNormal(ProbDistBase):
     @S.setter
     def S(self, value):
         self._S = value
-        self._cS = linalg.cholesky(S)
-        self._iS = linalg.inv(S)
+        self._cS = linalg.cholesky(value)
+        self._iS = linalg.inv(value)
 
 class Interval(object):
     def __init__(self, lower=0.0, upper=0.0):
