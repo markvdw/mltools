@@ -33,7 +33,10 @@ def jit_chol(mat, verbose=False):
         raise linalg.LinAlgError("Matrix not posdef, even with jitter.")
 
 
-def jitify(func, mat):
+last_jit = 0.0
+
+def jitify(func, mat, verbose=False):
+    global last_jit
     """
     jitify
     Repeatedly try 'func' while catching LinAlgErrors, with increasing jitter.
@@ -45,7 +48,10 @@ def jitify(func, mat):
     epsarr[0] = 0.0
     for eps in epsarr:
         try:
+            if verbose:
+                print "Trying %e" % eps
             result = func(mat + eps*I)
+            last_jit = eps
             return result
         except linalg.LinAlgError:
             pass
