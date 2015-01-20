@@ -45,22 +45,21 @@ class DummyImproperUniform(ProbDistBase):
 
 class MultivariateNormal(ProbDistBase):
     def __init__(self, mu, S, cS=None, iS=None):
-        if type(S) is int:
+        if (type(S) is int) or (type(S) is float):
             self.D = 1
             self.S = np.array([[S]])
         else:
-            S = np.array(S)
+            self.S = np.array(S)
             self.D = S.shape[0]
 
         self.mu = mu
-        self._S = S
         if iS is None:
-            self._iS = linalg.inv(S)
+            self._iS = linalg.inv(self.S)
         else:
             self._iS = iS
 
         if cS is None:
-            self._cS = linalg.cholesky(S)
+            self._cS = linalg.cholesky(self.S)
         else:
             self._cS = cS
 
