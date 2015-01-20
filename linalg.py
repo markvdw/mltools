@@ -28,7 +28,27 @@ def jit_chol(mat):
             except linalg.LinAlgError:
                 # Go to the next iteration...
                 pass
-        raise linalg.LinAlgError("Matrix not posdef, even with jitter")
+        raise linalg.LinAlgError("Matrix not posdef, even with jitter.")
+
+
+def jitify(func, mat):
+    """
+    jitify
+    Repeatedly try 'func' while catching LinAlgErrors, with increasing jitter.
+    :param func:
+    :return:
+    """
+    I = np.eye(mat.shape[0])
+    epsarr = np.logspace(-11, 0, 12)
+    epsarr[0] = 0.0
+    for eps in epsarr:
+        try:
+            result = func(mat + eps*I)
+            return result
+        except linalg.LinAlgError:
+            pass
+
+    raise linalg.LinAlgError("Matrix not posdef, even with jitter.")
 
 
 def check_sym(mat):
@@ -41,15 +61,15 @@ def check_sym(mat):
 
 
 def rotmat(rot_ax,theta):
-    '''
+    """
     rotmat
     Generate a 3D matrix that rotates a vector around the vector rot_ax by
     angle theta.
-    
+
     Parameters:
      - rot_ax
      - theta
-    '''
+    """
     rot_ax = rot_ax/math.sqrt(np.dot(rot_ax,rot_ax))
     a = math.cos(theta/2)
     b,c,d = -rot_ax*math.sin(theta/2)
