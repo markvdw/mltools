@@ -11,6 +11,9 @@ import numpy as np
 import numpy.linalg as linalg
 import numpy.random as random
 from scipy import constants
+from scipy.special import erf
+
+import linalg as mlin
 
 class ProbDistBase(object):
     def logpdf(self):
@@ -44,7 +47,7 @@ class DummyImproperUniform(ProbDistBase):
         return 1.0
 
 class MultivariateNormal(ProbDistBase):
-    def __init__(self, mu, S, cS=None, iS=None):
+    def __init__(self, mu, S, cS=None, iS=None, jitchol=False):
         if (type(S) is int) or (type(S) is float):
             self.D = 1
             self.S = np.array([[S]])
@@ -59,7 +62,10 @@ class MultivariateNormal(ProbDistBase):
             self._iS = iS
 
         if cS is None:
-            self._cS = linalg.cholesky(self.S)
+            if jitchol:
+                self._cS = mlin.jit_chol(5)
+            else:
+                self._cS = linalg.cholesky(self.S)
         else:
             self._cS = cS
 
@@ -291,6 +297,14 @@ def mvnpdf (X, mu, Sigma):
         pdf[n] = normconst * np.exp(-0.5 * d.dot(iS.dot(d)))
 
     return pdf
+
+
+def phi (z):
+    """
+    phi
+    Calculate the univariate normal cumulative density function.
+    """
+    return 0.5 * (1 + erf(z / 2**0.5))
 
 
 def mvn_entropy(mu, Sigma):
