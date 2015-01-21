@@ -53,7 +53,7 @@ class MultivariateNormal(ProbDistBase):
             self.S = np.array([[S]])
         else:
             self.S = np.array(S)
-            self.D = S.shape[0]
+            self.D = self.S.shape[0]
 
         self.mu = mu
         if iS is None:
