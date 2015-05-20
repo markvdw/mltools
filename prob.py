@@ -16,14 +16,14 @@ from scipy.special import erf
 import linalg as mlin
 
 class ProbDistBase(object):
-    def logpdf(self):
+    def logpdf(self, *args, **kwargs):
         raise NotImplementedError()
 
-    def logjpdf(self):
-        raise NotImplementedError()
+    def logjpdf(self, *args, **kwargs):
+        return np.sum(self.logpdf(*args, **kwargs))
 
-    def pdf(self):
-        raise NotImplementedError()
+    def pdf(self, *args, **kwargs):
+        return np.exp(self.logpdf(*args, **kwargs))
 
     def sample(self):
         raise NotImplementedError()
