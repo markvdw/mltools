@@ -16,6 +16,12 @@ from scipy.special import erf
 import linalg as mlin
 
 class ProbDistBase(object):
+    """
+    ProbDistBase
+    Base class for a probability distribution. Maybe a better name for this should be "random variable". The idea is to
+    have a completely encapsulated random variable that can be sampled from, and have its density evaluated. Should take
+    any of its parameters during construction.
+    """
     def logpdf(self, *args, **kwargs):
         raise NotImplementedError()
 
@@ -29,6 +35,31 @@ class ProbDistBase(object):
         raise NotImplementedError()
 
     def entropy(self):
+        raise NotImplementedError()
+
+class LikelihoodBase(object):
+    """
+    LikelihoodBase
+    Base class for a likelihood. Should pass the data and any parameters during the construction so that the likelihood
+    can then be evaluated with no further information. Should also be able to sample data given a parameter or sample
+    from a model given a prior distribution.
+    """
+    def loglik(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def lik(self, *args, **kwargs):
+        return np.exp(self.loglik(*args, **kwargs))
+
+    def logpdf(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def logjpdf(self, *args, **kwargs):
+        return np.sum(self.logpdf(*args, **kwargs))
+
+    def pdf(self, *args, **kwargs):
+        return np.exp(self.logpdf(*args, **kwargs))
+
+    def sample(self):
         raise NotImplementedError()
 
 class DummyImproperUniform(ProbDistBase):
