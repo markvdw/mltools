@@ -43,9 +43,10 @@ class ProbDistBase(object):
     def entropy(self):
         raise NotImplementedError()
 
-    def entropy_mc(self, samples=1):
-        s = self.sample(samples)
-        return -self.logjpdf(s) / len(s)
+    def entropy_mc(self, samples=1, s=None):
+        if s is None:
+            s = self.sample(samples)
+        return -self.logjpdf(s[:samples, :]) / samples
 
     def plot(self):
         raise NotImplementedError()
@@ -123,6 +124,7 @@ class MixtureOfGaussians(Mixture):
                 samples = s
             else:
                 samples = np.vstack((s, samples))
+        random.shuffle(samples)
         return samples
 
     def plot(self):
@@ -133,8 +135,16 @@ class MixtureOfGaussians(Mixture):
                             max_p.mu + 4.0 * max_p.S.flatten()**0.5,
                             500)[:, None]
             probs = self.pdf(X)
+            s = self.sample(5000)
+            plt.hist(s, bins=80, normed=True)
             plt.plot(X, probs)
             # print("Area under curve: %f" % (np.sum(probs) * (X[1] - X[0])))
+
+    def __str__(self):
+        return """Mixture of Gaussians
+D imension: %i
+M ixtures : %i
+Weights   : %s""" % (self.D, len(self._distlist), str(self._weights))
     
     @classmethod
     def random_init(cls, D=2, M=3, meanscale=1.0):
