@@ -54,3 +54,14 @@ class ExperimentBase(object):
         if val[-1] != '/':
             val += '/'
         self._savedir = val
+
+
+class TrainTestTask(object):
+    def __init__(self, model_params):
+        pass
+
+    def train(self, traindata):
+        pass
+
+    def test(self):
+        pass

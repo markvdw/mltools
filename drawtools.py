@@ -10,6 +10,7 @@ import numpy.linalg as linalg
 
 import scipy as sp
 import scipy.constants
+import scipy.interpolate as spinterpolate
 
 import matplotlib as mplot
 import matplotlib.pyplot as plt
@@ -19,6 +20,11 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d import proj3d
 from matplotlib.backends.backend_pdf import PdfPages
 
+
+def irreg_contour(x, y, z, xi, yi, **kwargs):
+    zi = spinterpolate.griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
+
+    plt.contour(xi, yi, zi, 15)
 
 class Arrow3D(FancyArrowPatch):
     def __init__(self, xs, ys, zs, *args, **kwargs):
