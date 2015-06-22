@@ -1,5 +1,5 @@
 ###############################################################################
-# prob.y
+# prob.py
 # Some probability functions used for Machine Learning programming in Python.
 #
 # Mark van der Wilk (mv310@cam.ac.uk)
@@ -7,11 +7,17 @@
 
 from __future__ import division
 
+import collections
+import operator
+
 import numpy as np
 import numpy.linalg as linalg
 import numpy.random as random
 from scipy import constants
 from scipy.special import erf
+import scipy.stats as stats
+
+import matplotlib.pyplot as plt
 
 import linalg as mlin
 
@@ -31,6 +37,13 @@ class ProbDistBase(object):
     def entropy(self):
         raise NotImplementedError()
 
+    def entropy_mc(self, samples=1):
+        s = self.sample(samples)
+        return -self.logjpdf(s) / len(s)
+
+    def plot(self):
+        raise NotImplementedError()
+
 class DummyImproperUniform(ProbDistBase):
     """
     DummyImproperUniform
@@ -46,6 +59,55 @@ class DummyImproperUniform(ProbDistBase):
     def pdf(self, X):
         return 1.0
 
+class Mixture(ProbDistBase):
+    def __init__(self, distribution_list, weights):
+        self._distlist = distribution_list
+        self._weights = weights
+
+    def logpdf(self, X):
+        return np.log(np.sum(np.hstack([p.pdf(X) for p in self._distlist]) * self._weights[None, :], 1))
+        
+
+class MixtureOfGaussians(Mixture):
+    def __init__(self, param_dist_list, weights):
+        if type(param_dist_list) is list:
+            Mixture.__init__(self, param_dist_list, weights)
+        else:
+            Mixture.__init__(self, [MultivariateNormal(*param) for param in param_list], weights)
+
+        dims = set([dist.D for dist in self._distlist])
+        if len(dims) > 1:
+            raise ValueError("Can not have mixtures of different dimension...")
+        self.D = self._distlist[0].D
+        self.wp = stats.rv_discrete(values=(range(0, len(weights)), weights))
+
+    def sample(self, N=1):
+        c = collections.Counter(self.wp.rvs(size=N))
+        samples = None
+        for mixture_idx in c:
+            s = self._distlist[mixture_idx].sample(c[mixture_idx])
+            if samples is None:
+                samples = s
+            else:
+                samples = np.vstack((s, samples))
+        return samples
+
+    def plot(self):
+        if self.D == 1:
+            min_p = self._distlist[np.argmin([p.mu for p in self._distlist])]
+            max_p = self._distlist[np.argmax([p.mu for p in self._distlist])]
+            X = np.linspace(min_p.mu - 4.0 * min_p.S.flatten()**0.5,
+                            max_p.mu + 4.0 * max_p.S.flatten()**0.5,
+                            500)[:, None]
+            probs = self.pdf(X)
+            plt.plot(X, probs)
+            # print("Area under curve: %f" % (np.sum(probs) * (X[1] - X[0])))
+    
+    @classmethod
+    def random_init(cls, D=2, M=3, meanscale=1.0):
+        return cls([MultivariateNormal.random_init(D, meanscale) for _ in xrange(M)], random.dirichlet([1] * M))
+
+    
 class MultivariateNormal(ProbDistBase):
     def __init__(self, mu, S, cS=None, iS=None, jitchol=False):
         if (type(S) is int) or (type(S) is float):
@@ -81,10 +143,24 @@ class MultivariateNormal(ProbDistBase):
     def sample(self, N=1):
         return self._cS.dot(random.randn(self.D, N)).T + self.mu
 
-    
     def entropy(self):
         logdet_cov = 2.0*np.sum(np.log(np.diag(self._cS)))
         return 0.5 * self.D * (1. + np.log(2*np.pi)) + 0.5 * logdet_cov
+
+    def plot(self):
+        if self.D == 1:
+            X = np.linspace(-4*self.S.flatten()**0.5 + self.mu, 4*self.S.flatten()**0.5 + self.mu, 100)[:, None]
+            p = self.pdf(X)
+            plt.plot(X, p)
+            plt.title('mean: %f, std: %f' % (self.mu, self.S.flatten()**.5))
+        elif self.D == 2:
+            s = self.sample(300)
+            plt.plot(s[:, 0], s[:, 1], 'x')
+        elif self.D == 3:
+            s = self.sample(300)
+            plt.plot(s[:, 0], s[:, 1], s[:, 2], 'x')
+        else:
+            print "I don't know how to draw this. D = %i" % self.D
 
     @property
     def S(self):
@@ -95,6 +171,11 @@ class MultivariateNormal(ProbDistBase):
         self._S = value
         self._cS = linalg.cholesky(value)
         self._iS = linalg.inv(value)
+
+    @classmethod
+    def random_init(cls, D=2, meanscale=1.0):
+        cov = random.randn(D, D)
+        return cls(random.randn(D) * meanscale, np.dot(cov, cov.T))
 
 class Interval(object):
     def __init__(self, lower=0.0, upper=0.0):
