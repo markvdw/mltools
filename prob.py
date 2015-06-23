@@ -44,6 +44,7 @@ class ProbDistBase(object):
         raise NotImplementedError()
 
     def entropy_mc(self, samples=1, s=None):
+        samples = np.round(samples)
         if s is None:
             s = self.sample(samples)
         return -self.logjpdf(s[:samples, :]) / samples
@@ -139,6 +140,8 @@ class MixtureOfGaussians(Mixture):
             plt.hist(s, bins=80, normed=True)
             plt.plot(X, probs)
             # print("Area under curve: %f" % (np.sum(probs) * (X[1] - X[0])))
+        else:
+            print "Don't know what to do with D=%i..." % self.D
 
     def __str__(self):
         return """Mixture of Gaussians
@@ -219,6 +222,15 @@ class MultivariateNormal(ProbDistBase):
     def random_init(cls, D=2, meanscale=1.0):
         cov = random.randn(D, D)
         return cls(random.randn(D) * meanscale, np.dot(cov, cov.T))
+
+    def __str__(self, params=False):
+        if params:
+            return """Multivariate Normal
+Mean      : %s
+Covariance: %s""" % (str(self.mu), str(self.S))
+        else:
+            return """Multivariate Normal
+D imension: %i""" % self.D
 
 class Interval(object):
     def __init__(self, lower=0.0, upper=0.0):
