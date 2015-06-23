@@ -97,7 +97,7 @@ class DummyImproperUniform(ProbDistBase):
 class Mixture(ProbDistBase):
     def __init__(self, distribution_list, weights):
         self._distlist = distribution_list
-        self._weights = weights
+        self._weights = np.array(weights)
 
     def logpdf(self, X):
         return np.log(np.sum(np.hstack([p.pdf(X) for p in self._distlist]) * self._weights[None, :], 1))
@@ -128,7 +128,7 @@ class MixtureOfGaussians(Mixture):
         random.shuffle(samples)
         return samples
 
-    def plot(self):
+    def plot(self, plot_hist=False):
         if self.D == 1:
             min_p = self._distlist[np.argmin([p.mu for p in self._distlist])]
             max_p = self._distlist[np.argmax([p.mu for p in self._distlist])]
@@ -137,17 +137,36 @@ class MixtureOfGaussians(Mixture):
                             500)[:, None]
             probs = self.pdf(X)
             s = self.sample(5000)
-            plt.hist(s, bins=80, normed=True)
+            if plot_hist:
+                plt.hist(s, bins=80, normed=True)
             plt.plot(X, probs)
             # print("Area under curve: %f" % (np.sum(probs) * (X[1] - X[0])))
         else:
-            print "Don't know what to do with D=%i..." % self.D
+            plt.imshow(self.S, interpolation="None")
 
     def __str__(self):
         return """Mixture of Gaussians
 D imension: %i
 M ixtures : %i
 Weights   : %s""" % (self.D, len(self._distlist), str(self._weights))
+
+    def entropy_independent(self):
+        # Independent entropy bound from Alex's paper
+        entropies = [p.entropy() * w for (p, w) in zip(self._distlist, self._weights)]
+        return np.sum(entropies)
+
+    def entropy_mixture(self):
+        ent = -np.sum(
+            [wi * np.log(np.sum(
+                [mvnpdf(pi.mu, pj.mu, pi.S + pj.S) * wj for pj, wj in zip(self._distlist, self._weights)]
+            )) for (pi, wi) in zip(self._distlist, self._weights)]
+        )
+        return ent
+
+    def entropy_mixind(self):
+        ind = self.entropy_independent()
+        mix = self.entropy_mixture()
+        return np.max([ind, mix])
     
     @classmethod
     def random_init(cls, D=2, M=3, meanscale=1.0):
@@ -163,7 +182,10 @@ class MultivariateNormal(ProbDistBase):
             self.S = np.array(S)
             self.D = self.S.shape[0]
 
+        if type(mu) is int or type(mu) is float:
+            mu = np.array([mu])
         self.mu = mu
+
         if iS is None:
             self._iS = linalg.inv(self.S)
         else:
