@@ -13,11 +13,13 @@ import operator
 import numpy as np
 import numpy.linalg as linalg
 import numpy.random as random
+import scipy.stats as stats
 from scipy import constants
 from scipy.special import erf
-import scipy.stats as stats
+from scipy.misc import logsumexp
 
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 import linalg as mlin
 
@@ -100,8 +102,28 @@ class Mixture(ProbDistBase):
         self._weights = np.array(weights)
 
     def logpdf(self, X):
-        return np.log(np.sum(np.hstack([p.pdf(X) for p in self._distlist]) * self._weights[None, :], 1))
+        return logsumexp(np.hstack([p.logpdf(X) for p in self._distlist]) + np.log(self._weights[None, :]), 1)
+
+    def log_posterior_mixture(self, X):
+        """
+        posterior_mixture
+        Calculate the posterior distribution over what mixture the samples came from.
+        Inputs:
+          X: NxD matrix.
+        Outputs:
+          p: NxM matrix. Normalised probability vector with posterior probabilities of each mixture.
+        """
+        p = np.zeros((X.shape[0], len(self._weights)))
+        for i, (component, w) in enumerate(zip(self._distlist, self._weights)):
+            p[:, i] = (component.logpdf(X) + np.log(w)).flatten()
+
+        normconsts = logsumexp(p, 1)
+        p = p - normconsts[:, None]
         
+        return p
+
+    def posterior_mixture(self, X):
+        return np.exp(self.log_posterior_mixture(X))
 
 class MixtureOfGaussians(Mixture):
     def __init__(self, param_dist_list, weights):
@@ -128,12 +150,15 @@ class MixtureOfGaussians(Mixture):
         random.shuffle(samples)
         return samples
 
-    def plot(self, plot_hist=False):
+    def plot(self, plot_hist=False, log=False, bounds=None):
         if self.D == 1:
             min_p = self._distlist[np.argmin([p.mu for p in self._distlist])]
             max_p = self._distlist[np.argmax([p.mu for p in self._distlist])]
-            X = np.linspace(min_p.mu - 4.0 * min_p.S.flatten()**0.5,
-                            max_p.mu + 4.0 * max_p.S.flatten()**0.5,
+            if bounds is None:
+                bounds = [min_p.mu - 4.0 * min_p.S.flatten()**0.5,
+                          max_p.mu + 4.0 * max_p.S.flatten()**0.5]
+            X = np.linspace(bounds[0],
+                            bounds[1],
                             500)[:, None]
             probs = self.pdf(X)
             s = self.sample(5000)
@@ -141,8 +166,29 @@ class MixtureOfGaussians(Mixture):
                 plt.hist(s, bins=80, normed=True)
             plt.plot(X, probs)
             # print("Area under curve: %f" % (np.sum(probs) * (X[1] - X[0])))
+        elif self.D == 2:
+            s = self.sample(400)
+            means = np.vstack([p.mu for p in self._distlist])            
+            vals, vecs = linalg.eigh(self.covariance)
+            d = np.sum(np.abs(vecs.dot(np.diag(vals**0.5))), 1)
+            X, Y = np.meshgrid(np.linspace(min(self.mean[0] - 2 * d[0], np.min(means[0])),
+                                           max(self.mean[0] + 2 * d[0], np.max(means[0])), 100),
+                               np.linspace(min(self.mean[1] - 2 * d[1], np.min(means[1])),
+                                           max(self.mean[1] + 2 * d[1], np.max(means[1])), 100))
+            xy = np.hstack((X.flatten()[:, None], Y.flatten()[:, None]))
+            if log:
+                p = self.logpdf(xy)
+            else:
+                p = self.pdf(xy)
+            Z = p.reshape(len(X), len(Y))
+            plt.plot(means[:, 0], means[:, 1], 'o')
+            plt.contour(X, Y, Z)
+        elif self.D == 3:
+            s = self.sample(500)
+            plt.gcf().add_subplot(111, projection='3d')
+            plt.plot(s[:, 0], s[:, 1], s[:, 2], 'x')
         else:
-            plt.imshow(self.S, interpolation="None")
+            print "I don't know what to do with D=%i..." % self.D
 
     def __str__(self):
         return """Mixture of Gaussians
@@ -157,9 +203,9 @@ Weights   : %s""" % (self.D, len(self._distlist), str(self._weights))
 
     def entropy_mixture(self):
         ent = -np.sum(
-            [wi * np.log(np.sum(
-                [mvnpdf(pi.mu, pj.mu, pi.S + pj.S) * wj for pj, wj in zip(self._distlist, self._weights)]
-            )) for (pi, wi) in zip(self._distlist, self._weights)]
+            [wi * logsumexp(
+                [mvnlogpdf(pi.mu, pj.mu, pi.S + pj.S) + np.log(wj) for pj, wj in zip(self._distlist, self._weights)]
+            ) for (pi, wi) in zip(self._distlist, self._weights)]
         )
         return ent
 
@@ -167,10 +213,62 @@ Weights   : %s""" % (self.D, len(self._distlist), str(self._weights))
         ind = self.entropy_independent()
         mix = self.entropy_mixture()
         return np.max([ind, mix])
+
+    # def entropy_mc_naive(self, *args):
+    #     return Mixture.entropy_mc(self, *args)
+
+    def entropy_mc(self, samples=1, s=None, method="improved"):
+        if method == "improved":
+            samples = np.round(samples)
+            if s is None:
+                s = self.sample(samples)
+            else:
+                s = s[:samples, :]
+            HY = stats.entropy(self._weights)
+            HXcY = self.entropy_independent()
+            post = self.posterior_mixture(s)
+            HYcX = np.mean(stats.entropy(post.T))
+            return HY + HXcY - HYcX
+        elif method == "naive":
+            return Mixture.entropy_mc(self, samples, s)
+        else:
+            raise ValueError("I don't know the method '%s'..." % method)
+
+    def entropy_upper(self, bound='comb'):
+        if bound == 'huberbasic' or bound == 0:
+            return np.sum([w * (-np.log(w) + p.entropy()) for w, p in zip(self._weights, self._distlist)])
+        elif bound == 'momentgauss' or bound == 1:
+            return mvn_entropy(np.atleast_1d(self.mean), np.atleast_2d(self.covariance))
+        elif bound == 'comb':
+            vals = []
+            try:
+                i = 0
+                while True:
+                    vals.append(self.entropy_upper(i))
+                    i += 1
+            except ValueError:
+                return np.min(vals)
+        elif type(bound) is int:
+            raise ValueError("I don't know this approximation...")
+
+    @property
+    def mean(self):
+        return np.sum(np.vstack([w * p.mu for w, p in zip(self._weights, self._distlist)]), 0)
+
+    @property
+    def covariance(self):
+        mixmean = self.mean
+        return np.sum(
+            np.dstack([w * (p.S + np.outer(p.mu - mixmean, p.mu - mixmean)) for w, p in zip(self._weights, self._distlist)])
+            , 2)
     
     @classmethod
-    def random_init(cls, D=2, M=3, meanscale=1.0):
-        return cls([MultivariateNormal.random_init(D, meanscale) for _ in xrange(M)], random.dirichlet([1] * M))
+    def random_init(cls, D=2, M=3, meanscale=1.0, const_weights=False):
+        if const_weights:
+            weights = [1.0 / M] * M
+        else:
+            weights = random.dirichlet([1] * M)
+        return cls([MultivariateNormal.random_init(D, meanscale) for _ in xrange(M)], weights)
 
     
 class MultivariateNormal(ProbDistBase):
@@ -228,7 +326,7 @@ class MultivariateNormal(ProbDistBase):
             s = self.sample(300)
             plt.plot(s[:, 0], s[:, 1], s[:, 2], 'x')
         else:
-            print "I don't know how to draw this. D = %i" % self.D
+            plt.imshow(self.S, interpolation="None")
 
     @property
     def S(self):
@@ -242,8 +340,10 @@ class MultivariateNormal(ProbDistBase):
 
     @classmethod
     def random_init(cls, D=2, meanscale=1.0):
-        cov = random.randn(D, D)
-        return cls(random.randn(D) * meanscale, np.dot(cov, cov.T))
+        prec = random.randn(D, D + 2) / (D + 2)
+        prec = np.dot(prec, prec.T)
+        cov = linalg.inv(prec)
+        return cls(random.randn(D) * meanscale, cov, iS=prec)
 
     def __str__(self, params=False):
         if params:
