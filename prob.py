@@ -125,6 +125,10 @@ class Mixture(ProbDistBase):
     def posterior_mixture(self, X):
         return np.exp(self.log_posterior_mixture(X))
 
+    @property
+    def weights(self):
+        return self._weights
+
 class MixtureOfGaussians(Mixture):
     def __init__(self, param_dist_list, weights):
         if type(param_dist_list) is list:
@@ -261,6 +265,11 @@ Weights   : %s""" % (self.D, len(self._distlist), str(self._weights))
         return np.sum(
             np.dstack([w * (p.S + np.outer(p.mu - mixmean, p.mu - mixmean)) for w, p in zip(self._weights, self._distlist)])
             , 2)
+
+    @weights.setter
+    def weights(self, value):
+        self._weights = value
+        self.wp = stats.rv_discrete(values=(range(0, len(self._weights)), self._weights))
     
     @classmethod
     def random_init(cls, D=2, M=3, meanscale=1.0, const_weights=False):
