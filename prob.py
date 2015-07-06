@@ -266,6 +266,10 @@ Weights   : %s""" % (self.D, len(self._distlist), str(self._weights))
             np.dstack([w * (p.S + np.outer(p.mu - mixmean, p.mu - mixmean)) for w, p in zip(self._weights, self._distlist)])
             , 2)
 
+    @property
+    def weights(self):
+        return self._weights
+
     @weights.setter
     def weights(self, value):
         self._weights = value
