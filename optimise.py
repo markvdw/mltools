@@ -8,9 +8,10 @@ import matplotlib.pyplot as plt
 
 
 class optimisation_history (object):
-    def __init__(self, func, grad, print_gap=1.0, print_growth=1.2, print_max=100):
+    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100):
         self.func = func
         self.grad = grad
+        self.func_args = args
         self.init_print_gap = print_gap
         self.print_growth = print_growth
         self.print_max = print_max
@@ -30,10 +31,10 @@ class optimisation_history (object):
             cur_time = time.time()
             time_per_iter = int(self.print_gap) / (cur_time - self.last_time)
 
-            fval = self.func(f)
-            gval = self.grad(f)
+            fval = self.func(f, *self.func_args)
+            gval = self.grad(f, *self.func_args)
             # print "%i\t%e\t%e\t%f" % (self.i, fval, np.sum(gval ** 2.0), time_per_iter)
-            sys.stdout.write("%i\t%e\t%e\t%f\r" % (self.i, fval, np.sum(gval ** 2.0), time_per_iter))
+            sys.stdout.write("%i\t%e\t%e\t%f\r" % (self.i, fval, np.sqrt(np.sum(gval ** 2.0)), time_per_iter))
 
             self.print_gap = min(self.print_growth * self.print_gap, self.print_max)
             self.nexti += int(self.print_gap)
@@ -54,25 +55,35 @@ class optimisation_history (object):
         self.last_time = time.time()
         print("Iter\tfunc\t\tgrad\t\titer/s")
 
-    def plot_f_hist(self, start_iter=0, plot_log=False, start_f=1):
+    def plot_f_hist(self, start_iter=0, plot_log=False, start_f=1, plot_grad=False):
         func_hist = []
+        grad_hist = []
         # We only store the parameters at each iteration, not the actual objective function value. So now we need to
         # recompute it.
         for f in self.hist:
-            func_hist.append(self.func(f))
+            func_hist.append(self.func(f, *self.func_args))
+            if plot_grad:
+                grad_hist.append(np.sum(self.grad(f, *self.func_args)**2.0)**0.5)
 
         iters = np.arange(start_iter, start_iter + len(func_hist))
 
-        # plt.plot(iters, func_hist)
+        if plot_grad:
+            plt.subplot(2,1,1)
         if plot_log:
             plt.plot(iters, func_hist / start_f, 'x')
             ax = plt.gca()
             ax.set_xscale('log')
             ax.set_yscale('log')
         else:
-            plt.plot(iters, func_hist, 'x')
+            try:
+                plt.plot(iters, func_hist, 'x')
+            except:
+                raise RuntimeError("Plotting failed!")
         plt.xlabel('Iteration')
         plt.ylabel('Function value')
+        if plot_grad:
+            plt.subplot(2,1,2)
+            plt.plot(iters, grad_hist)
 
         return len(func_hist) + start_iter
 
@@ -251,8 +262,9 @@ def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callb
 
         xprop = x - eps * grad + momentum
         fprop = fun(xprop, *args)
+        gprop = jac(xprop, *args)
 
-        if fprop < fold:
+        if (fprop < fold) and not (np.any(np.isnan(gprop))):
             x = xprop
             fold = fprop
             streak += 1
@@ -280,7 +292,7 @@ def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callb
             print streak, x, grad, fold, eps
         elif options['verbosity'] >= 2:
             # print streak, fold, eps
-            sys.stdout.write('streak: %i\tfold: %e\teps: %e\t sum(grad**2): %e\r' % (streak, fold, eps, np.sum(grad**2.0)))
+            sys.stdout.write('streak: %i\tfold: %e\teps: %e\t sum(grad**2): %e\r' % (streak, fold, eps, np.mean(grad**2.0)**0.5))
 
         if callback != None:
             callback(x)
