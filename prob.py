@@ -134,7 +134,7 @@ class MixtureOfGaussians(Mixture):
         if type(param_dist_list) is list:
             Mixture.__init__(self, param_dist_list, weights)
         else:
-            Mixture.__init__(self, [MultivariateNormal(*param) for param in param_list], weights)
+            Mixture.__init__(self, [MultivariateNormal(mu, S) for (mu, S) in zip(param_dist_list[0], param_dist_list[1])], weights)
 
         dims = set([dist.D for dist in self._distlist])
         if len(dims) > 1:
@@ -254,6 +254,14 @@ Weights   : %s""" % (self.D, len(self._distlist), str(self._weights))
                 return np.min(vals)
         elif type(bound) is int:
             raise ValueError("I don't know this approximation...")
+
+    @property
+    def means(self):
+        return np.vstack([p.mu for p in self._distlist])
+
+    @property
+    def covariances(self):
+        return np.vstack([p.S[None, :, :] for p in self._distlist])
 
     @property
     def mean(self):
@@ -580,6 +588,5 @@ def phi (z):
 
 def mvn_entropy(mu, Sigma):
     D = len(mu)
-
     _, logdet = linalg.slogdet(Sigma)
     return 0.5*D*(1.+np.log(2*np.pi)) + 0.5*logdet
