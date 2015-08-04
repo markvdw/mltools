@@ -8,13 +8,18 @@ import matplotlib.pyplot as plt
 
 
 class optimisation_history (object):
-    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100):
+    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100, verbose=1, chaincallback=None):
+        if chaincallback is not None:
+            self.chaincallback = chaincallback
+        else:
+            self.chaincallback = lambda *x: 0
         self.func = func
         self.grad = grad
         self.func_args = args
         self.init_print_gap = print_gap
         self.print_growth = print_growth
         self.print_max = print_max
+        self.verbose = verbose
 
         self.i = 0
         self.nexti = self.init_print_gap
@@ -23,25 +28,35 @@ class optimisation_history (object):
 
         self.hist = []
 
-    def iteration(self, f):
+    def iteration(self, f, force_print=False):
         self.hist.append(f)
         self.i += 1
 
-        if self.i == int(self.nexti):
+        if self.verbose == 0:
+            return
+
+        if self.i == int(self.nexti) or force_print:
             cur_time = time.time()
             time_per_iter = int(self.print_gap) / (cur_time - self.last_time)
 
             fval = self.func(f, *self.func_args)
             gval = self.grad(f, *self.func_args)
             # print "%i\t%e\t%e\t%f" % (self.i, fval, np.sum(gval ** 2.0), time_per_iter)
-            sys.stdout.write("%i\t%e\t%e\t%f\r" % (self.i, fval, np.sqrt(np.sum(gval ** 2.0)), time_per_iter))
+            sys.stdout.write("\r")
+            sys.stdout.write("%i\t%e\t%e\t%f\t" % (self.i, fval, np.sqrt(np.mean(gval ** 2.0)), time_per_iter))
+            sys.stdout.flush()
+            # print("%i\t%e\t%e\t%f\r" % (self.i, fval, np.sqrt(np.sum(gval ** 2.0)), time_per_iter))
 
             self.print_gap = min(self.print_growth * self.print_gap, self.print_max)
             self.nexti += int(self.print_gap)
             self.last_time = cur_time
+
+            self.chaincallback(self, f, fval, gval)
         else:
-            sys.stdout.write("%i\r" % self.i)
-            sys.stdout.flush()
+            # sys.stdout.write("%i\r" % self.i)
+            # sys.stdout.flush()
+            pass
+
 
     def reset(self):
         self.i = 0
@@ -55,7 +70,7 @@ class optimisation_history (object):
         self.last_time = time.time()
         print("Iter\tfunc\t\tgrad\t\titer/s")
 
-    def plot_f_hist(self, start_iter=0, plot_log=False, start_f=1, plot_grad=False):
+    def plot_f_hist(self, start_iter=0, plot_log=False, start_f=1, plot_grad=False, plot_opts={}):
         func_hist = []
         grad_hist = []
         # We only store the parameters at each iteration, not the actual objective function value. So now we need to
@@ -70,22 +85,22 @@ class optimisation_history (object):
         if plot_grad:
             plt.subplot(2,1,1)
         if plot_log:
-            plt.plot(iters, func_hist / start_f, 'x')
+            plt.plot(iters, func_hist / start_f, 'x', **plot_opts)
             ax = plt.gca()
             ax.set_xscale('log')
             ax.set_yscale('log')
         else:
             try:
-                plt.plot(iters, func_hist, 'x')
+                plt.plot(iters, func_hist, 'x', **plot_opts)
             except:
                 raise RuntimeError("Plotting failed!")
         plt.xlabel('Iteration')
         plt.ylabel('Function value')
         if plot_grad:
             plt.subplot(2,1,2)
-            plt.plot(iters, grad_hist)
+            plt.plot(iters, grad_hist, **plot_opts)
 
-        return len(func_hist) + start_iter
+        return len(func_hist) + start_iter, plt.gcf()
 
 
 def fd_sensitivity_struct(fun, struct, changevar, cg, fun_args=None, drange=(-12, 0), n=60, plot_all=False):
@@ -104,6 +119,17 @@ def fd_sensitivity_struct(fun, struct, changevar, cg, fun_args=None, drange=(-12
 
 
 def fd_sensitivity(fun, x0, cg, args=None, drange=(-12, 0), n=60, plot_all=False):
+    """
+    fd_sensitivity
+    Parameters:
+     fun     : Function to be tested
+     x0      : Location to be tested
+     cg      : Gradient at the location
+     args    : Additional arguments to the function
+     drange  : Logarithmic range to test on
+     # n     : Number of locations
+     plot_all: Plot all the changes
+    """
     if args is None:
         args = ()
 
@@ -227,76 +253,86 @@ def print_diffstats(diffstats, diff_max=True, percent_max=True, loc_percent_max=
 
 
 def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callback=None, options=None):
-    if args is None:
-        args = ()
+    try:
+        if args is None:
+            args = ()
 
-    if jac is None:
-        raise ValueError('Must supply a value for the Jacobian (gradient)')
+        if jac is None:
+            raise ValueError('Must supply a value for the Jacobian (gradient)')
 
-    options_default = {'max_eps': .1,
-                       'verbosity' :0,
-                       'maxiter': -1,
-                       'streak': 10,
-                       'momentum': 0.0}
+        options_default = {'max_eps': .1,
+                           'verbosity' :0,
+                           'maxiter': -1,
+                           'streak': 10,
+                           'momentum': 0.0,
+                           'min_eps':0}
 
-    if options is None:
-        options = options_default
+        if options is None:
+            options = options_default
 
-    for defkey in options_default:
-        if defkey not in options:
-            options[defkey] = options_default[defkey]
-    
-    x = x0
-    eps = options['max_eps']
-    momeps = options['momentum']
+        for defkey in options_default:
+            if defkey not in options:
+                options[defkey] = options_default[defkey]
 
-    fold = fun(x, *args)
-    momentum = 0.0
+        x = x0
+        eps = options['max_eps']
+        momeps = options['momentum']
 
-    opt_iteration = 0
-    streak = 0
-    moved = True
-    while opt_iteration != maxiter:
-        if moved:
-            grad = jac(x, *args)
+        fold = fun(x, *args)
+        momentum = 0.0
 
-        xprop = x - eps * grad + momentum
-        fprop = fun(xprop, *args)
-        gprop = jac(xprop, *args)
+        opt_iteration = 0
+        streak = 0
+        moved = True
+        while opt_iteration != maxiter:
+            if moved:
+                grad = jac(x, *args)
 
-        if (fprop < fold) and not (np.any(np.isnan(gprop))):
-            x = xprop
-            fold = fprop
-            streak += 1
+            xprop = x - eps * grad + momentum
+            fprop = fun(xprop, *args)
+            gprop = jac(xprop, *args)
 
-            momentum = momentum + momeps * - eps * grad
+            if (fprop < fold) and not (np.any(np.isnan(gprop))):
+                x = xprop
+                fold = fprop
+                streak += 1
 
-            if streak >= options['streak']:
-                eps *= 2.0
-                eps = min(eps, options['max_eps'])
+                momentum = momentum + momeps * - eps * grad
 
-            moved = True
-        else:
-            streak = 0
-            momentum = 0.0
-            eps /= 2.0
-            moved = False
+                if streak >= options['streak']:
+                    eps *= 2.0
+                    eps = min(eps, options['max_eps'])
 
-        # Termination condition
-        if np.sum(grad ** 2) < tol:
-            if options['verbosity'] >= 1:
-                print('Finished due to tolerance...')
-            break
+                moved = True
+            else:
+                streak = 0
+                momentum = 0.0
+                eps /= 2.0
+                moved = False
 
-        if options['verbosity'] >= 3:
-            print streak, x, grad, fold, eps
-        elif options['verbosity'] >= 2:
-            # print streak, fold, eps
-            sys.stdout.write('streak: %i\tfold: %e\teps: %e\t sum(grad**2): %e\r' % (streak, fold, eps, np.mean(grad**2.0)**0.5))
+            # Termination condition
+            if np.sum(grad ** 2) < tol:
+                if options['verbosity'] >= 1:
+                    print('Finished due to tolerance...')
+                break
+            elif eps < options['min_eps']:
+                print('Finished due to not moving...')
+                break
 
-        if callback != None:
-            callback(x)
+            if options['verbosity'] >= 4:
+                print streak, x, grad, fold, eps
+            if options['verbosity'] >= 3:
+                # print '%i\tstreak: %i\tfold: %e\teps: %e\t sum(grad**2): %e\r' % (opt_iteration, streak, fold, eps, np.mean(grad**2.0)**0.5)
+                print '%i\tstreak: %i\tfold: %e\teps: %e\t \r' % (opt_iteration, streak, fold, eps)
+            elif options['verbosity'] >= 2:
+                # print streak, fold, eps
+                sys.stdout.write('streak: %i\tfold: %e\teps: %e\t sum(grad**2): %e\r' % (streak, fold, eps, np.mean(grad**2.0)**0.5))
 
-        opt_iteration += 1
+            if callback != None:
+                callback(x)
+
+            opt_iteration += 1
+    except KeyboardInterrupt:
+        print("Finished due to keyboard interrupt...")
 
     return x
