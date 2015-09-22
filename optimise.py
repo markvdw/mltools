@@ -71,6 +71,7 @@ class optimisation_history (object):
         print("Iter\tfunc\t\tgrad\t\titer/s")
 
     def plot_f_hist(self, start_iter=0, plot_log=False, start_f=1, plot_grad=False, plot_opts={}):
+        linestyle = '-'
         func_hist = []
         grad_hist = []
         # We only store the parameters at each iteration, not the actual objective function value. So now we need to
@@ -85,13 +86,13 @@ class optimisation_history (object):
         if plot_grad:
             plt.subplot(2,1,1)
         if plot_log:
-            plt.plot(iters, func_hist / start_f, 'x', **plot_opts)
+            plt.plot(iters, func_hist / start_f, linestyle, **plot_opts)
             ax = plt.gca()
             ax.set_xscale('log')
             ax.set_yscale('log')
         else:
             try:
-                plt.plot(iters, func_hist, 'x', **plot_opts)
+                plt.plot(iters, func_hist, linestyle, **plot_opts)
             except:
                 raise RuntimeError("Plotting failed!")
         plt.xlabel('Iteration')
@@ -101,6 +102,16 @@ class optimisation_history (object):
             plt.plot(iters, grad_hist, **plot_opts)
 
         return len(func_hist) + start_iter, plt.gcf()
+
+
+def create_timeout_function(f, start_time, timeout):
+    def tf(x, *args):
+        if (time.time() - start_time) < timeout:
+            return f(x, *args)
+        else:
+            return np.zeros(len(x))
+
+    return tf
 
 
 def fd_sensitivity_struct(fun, struct, changevar, cg, fun_args=None, drange=(-12, 0), n=60, plot_all=False):
@@ -183,7 +194,6 @@ def grad_pd(cg, fd):
     pd = (cg - fd) / fd * 100.
 
 
-
 def finite_difference(fun, x0, args=None, d=10**-4):
     """
     finite_difference
@@ -204,9 +214,10 @@ def finite_difference(fun, x0, args=None, d=10**-4):
 
         fd = np.zeros(x0.shape + result_shape)
         for idx in np.ndindex(fd.shape[:len(x0.shape)]):
+            bck = x0[idx]
             x0[idx] += d
             f1 = fun(x0, *args)
-            x0[idx] -= d
+            x0[idx] = bck
             fd[idx] = (f1 - f0) / d
 
         return fd
