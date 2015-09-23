@@ -27,9 +27,11 @@ class optimisation_history (object):
         self.last_time = time.time()
 
         self.hist = []
+        self.times = []
 
     def iteration(self, f, force_print=False):
         self.hist.append(f)
+        self.times.append(time.time())
         self.i += 1
 
         if self.verbose == 0:
@@ -57,7 +59,6 @@ class optimisation_history (object):
             # sys.stdout.flush()
             pass
 
-
     def reset(self):
         self.i = 0
         self.nexti = self.init_print_gap
@@ -70,7 +71,7 @@ class optimisation_history (object):
         self.last_time = time.time()
         print("Iter\tfunc\t\tgrad\t\titer/s")
 
-    def plot_f_hist(self, start_iter=0, plot_log=False, start_f=1, plot_grad=False, plot_opts={}):
+    def plot_f_hist(self, start_iter=0, plot_log=False, start_f=1, plot_grad=False, plot_opts={}, iter_x_axis=True):
         linestyle = '-'
         func_hist = []
         grad_hist = []
@@ -82,33 +83,43 @@ class optimisation_history (object):
                 grad_hist.append(np.sum(self.grad(f, *self.func_args)**2.0)**0.5)
 
         iters = np.arange(start_iter, start_iter + len(func_hist))
+        times = np.array(self.times) - self.times[0]
+
+        if iter_x_axis:
+            x = iters
+            xlabel = "Iteration"
+        else:
+            x = times
+            xlabel = "Time (s)"
 
         if plot_grad:
             plt.subplot(2,1,1)
         if plot_log:
-            plt.plot(iters, func_hist / start_f, linestyle, **plot_opts)
+            plt.plot(x, func_hist / start_f, linestyle, **plot_opts)
             ax = plt.gca()
             ax.set_xscale('log')
             ax.set_yscale('log')
         else:
             try:
-                plt.plot(iters, func_hist, linestyle, **plot_opts)
+                plt.plot(x, func_hist, linestyle, **plot_opts)
             except:
                 raise RuntimeError("Plotting failed!")
-        plt.xlabel('Iteration')
+        plt.xlabel(xlabel)
         plt.ylabel('Function value')
         if plot_grad:
             plt.subplot(2,1,2)
-            plt.plot(iters, grad_hist, **plot_opts)
+            plt.plot(x, grad_hist, **plot_opts)
 
         return len(func_hist) + start_iter, plt.gcf()
 
 
-def create_timeout_function(f, start_time, timeout):
+def create_timeout_function(f, start_time, timeout, verbose=False):
     def tf(x, *args):
         if (time.time() - start_time) < timeout:
             return f(x, *args)
         else:
+            if verbose:
+                print("Timeout!")
             return np.zeros(len(x))
 
     return tf
