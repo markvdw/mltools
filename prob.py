@@ -23,6 +23,8 @@ from mpl_toolkits.mplot3d import Axes3D
 
 import linalg as mlin
 
+import drawtools as draw
+
 class ProbDistBase(object):
     """
     ProbDistBase
@@ -343,6 +345,8 @@ class MultivariateNormal(ProbDistBase):
         elif self.D == 2:
             s = self.sample(300)
             plt.plot(s[:, 0], s[:, 1], 'x')
+            ax = plt.gca()
+            draw.DrawCovarianceContour(ax, self._iS, self.mu)
         elif self.D == 3:
             s = self.sample(300)
             plt.plot(s[:, 0], s[:, 1], s[:, 2], 'x')
