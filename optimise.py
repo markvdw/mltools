@@ -112,6 +112,22 @@ class optimisation_history (object):
 
         return len(func_hist) + start_iter, plt.gcf()
 
+    def plot_x_hist(self, prop=True, plot_opts={}, x_axis="iter"):
+        hist = np.array(self.hist)
+        if x_axis == "iter":
+            x = np.arange(0, hist.shape[0])
+            xlabel = "iteration"
+        elif x_axis == "time":
+            x = np.array(self.times)
+            xlabel = "time (s)"
+        else:
+            raise NotImplementedError("Don't know this x-axis type...")
+
+        if prop:
+            hist = hist / hist[-1, :]
+        plt.plot(x, hist)
+        plt.xlabel(xlabel)
+
 
 def create_timeout_function(f, start_time, timeout, verbose=False):
     def tf(x, *args):
