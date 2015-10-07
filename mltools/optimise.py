@@ -3,35 +3,119 @@ import collections
 import time
 
 import numpy as np
+import scipy.optimize as opt
 
 import matplotlib.pyplot as plt
 
 
+def minimize(fun,
+             x0,
+             args=(),
+             method=None,
+             jac=None,
+             hess=None,
+             hessp=None,
+             bounds=None,
+             constraints=(),
+             tol=None,
+             callback=None,
+             options=None,
+             hist=None,
+             timeout=np.inf,
+             optscale=1):
+    if type(x0) is optimisation_history:
+        # We can set x0 to a optimisation_history object to continue the optimisation! Currently only limited support.
+        hist = x0
+
+        x0 = hist.hist[-1]
+        if fun is None:
+            fun = hist.func
+        jac = hist.grad
+        args = hist.func_args
+        hist.resume()
+        print "Resuming from optimisation_history object"
+    elif hist is None:
+        if jac is None:
+            histjac = lambda x: 0
+        else:
+            histjac = jac
+        hist = optimisation_history(fun, histjac, chaincallback=callback, optscale=optscale, args=args)
+    elif type(hist) is optimisation_history:
+        hist.resume()
+
+    fun_timeout = create_timeout_function(fun, timeout)
+
+    start_time = time.time()
+    try:
+        r = opt.minimize(fun_timeout,
+                         x0,
+                         args=args,
+                         method=method,
+                         jac=jac,
+                         hess=hess,
+                         hessp=hessp,
+                         bounds=bounds,
+                         constraints=constraints,
+                         tol=tol,
+                         callback=hist.iteration,
+                         options=options)
+    except (OptimisationTimeout, KeyboardInterrupt) as e:
+        if type(e) is OptimisationTimeout:
+            message = "Optimisation timeout after %fs" % (time.time() - start_time)
+        elif type(e) is KeyboardInterrupt:
+            message = "Optimisation cancelled by keyboard after %fs" % (time.time() - start_time)
+        else:
+            raise NotImplementedError("Shouldn't happen!")
+        r = opt.OptimizeResult(x=hist.hist[-1],
+                               success=False,
+                               message=message,
+                               fun=fun(hist.hist[-1]),
+                               jac=jac(hist.hist[-1]))
+    print("")
+    r.hist = hist
+
+    return r
+
+
 class optimisation_history (object):
-    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100, verbose=1, chaincallback=None):
+    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100, verbose=1, chaincallback=None, optscale=1):
         if chaincallback is not None:
             self.chaincallback = chaincallback
         else:
             self.chaincallback = lambda *x: 0
+
+        # Storage of parameters of the optimisation
         self.func = func
         self.grad = grad
         self.func_args = args
+        self.optscale = optscale
+
+        # Parameters for the display during optimisation
         self.init_print_gap = print_gap
         self.print_growth = print_growth
         self.print_max = print_max
         self.verbose = verbose
 
+        # Static variables for use during optimisation
         self.i = 0
         self.nexti = self.init_print_gap
         self.print_gap = self.init_print_gap
         self.last_time = time.time()
 
+        # Variables for final display
         self.hist = []
         self.times = []
+        self.times_abs = []
+        self.time_offset = time.time()
+        self.func_hist = []
+        self.grad_hist = []
+
+        print("Iter\tfunc\t\tgrad\t\titer/s")
 
     def iteration(self, f, force_print=False):
         self.hist.append(f)
-        self.times.append(time.time())
+        self.times.append(time.time() - self.time_offset)
+        self.times_abs.append(time.time())
         self.i += 1
 
         if self.verbose == 0:
@@ -41,8 +125,8 @@ class optimisation_history (object):
             cur_time = time.time()
             time_per_iter = int(self.print_gap) / (cur_time - self.last_time)
 
-            fval = self.func(f, *self.func_args)
-            gval = self.grad(f, *self.func_args)
+            fval = self.func(f, *self.func_args) * self.optscale
+            gval = self.grad(f, *self.func_args) * self.optscale
             # print "%i\t%e\t%e\t%f" % (self.i, fval, np.sum(gval ** 2.0), time_per_iter)
             sys.stdout.write("\r")
             sys.stdout.write("%i\t%e\t%e\t%f\t" % (self.i, fval, np.sqrt(np.mean(gval ** 2.0)), time_per_iter))
@@ -59,60 +143,68 @@ class optimisation_history (object):
             # sys.stdout.flush()
             pass
 
-    def reset(self):
-        self.i = 0
-        self.nexti = self.init_print_gap
-        self.print_gap = self.init_print_gap
-        self.hist = []
-
-        self.resume()
+    # def reset(self):
+    #     self.i = 0
+    #     self.nexti = self.init_print_gap
+    #     self.print_gap = self.init_print_gap
+    #     self.hist = []
+    #     self.time_offset = 0
+    #     self.resume()
 
     def resume(self):
         self.last_time = time.time()
+        self.time_offset = time.time() - self.times[-1]
         print("Iter\tfunc\t\tgrad\t\titer/s")
 
-    def plot_f_hist(self, start_iter=0, plot_log=False, start_f=1, plot_grad=False, plot_opts={}, iter_x_axis=True):
-        linestyle = '-'
-        func_hist = []
-        grad_hist = []
+    def update_hist(self, update_grad=False):
         # We only store the parameters at each iteration, not the actual objective function value. So now we need to
         # recompute it.
-        for f in self.hist:
-            func_hist.append(self.func(f, *self.func_args))
-            if plot_grad:
-                grad_hist.append(np.sum(self.grad(f, *self.func_args)**2.0)**0.5)
+        func_append = []
+        grad_append = []
+        for i in xrange(len(self.func_hist), len(self.hist)):
+            func_append.append(self.func(self.hist[i], *self.func_args) * self.optscale)
 
-        iters = np.arange(start_iter, start_iter + len(func_hist))
-        times = np.array(self.times) - self.times[0]
+        if update_grad:
+            for i in xrange(len(self.grad_hist), len(self.hist)):
+                grad_append.append(
+                    np.mean((self.grad(self.hist[i], *self.func_args) * self.optscale)**2.0)**0.5
+                )
 
-        if iter_x_axis:
-            x = iters
+        self.func_hist = np.hstack((self.func_hist, func_append))
+        assert len(self.hist) == len(self.func_hist)
+        if update_grad:
+            self.grad_hist = np.hstack((self.grad_hist, grad_append))
+            assert len(self.hist) == len(self.grad_hist)
+
+    def plot_f_hist(self, plot_grad=False, plot_opts={}, x_axis="iter"):
+        linestyle = '-'
+        axs = []
+
+        self.update_hist(plot_grad)
+
+        if x_axis == "iter":
+            x = np.arange(0, len(self.func_hist))
             xlabel = "Iteration"
-        else:
-            x = times
+        elif x_axis == "time":
+            x = np.array(self.times) - self.times[0]
             xlabel = "Time (s)"
+        else:
+            raise NotImplementedError("Don't know this x-axis type")
 
         if plot_grad:
-            plt.subplot(2,1,1)
-        if plot_log:
-            plt.plot(x, func_hist / start_f, linestyle, **plot_opts)
-            ax = plt.gca()
-            ax.set_xscale('log')
-            ax.set_yscale('log')
+            axs.append(plt.subplot(2,1,1))
         else:
-            try:
-                plt.plot(x, func_hist, linestyle, **plot_opts)
-            except:
-                raise RuntimeError("Plotting failed!")
+            axs.append(plt.gca())
+        plt.plot(x, self.func_hist, linestyle, **plot_opts)
         plt.xlabel(xlabel)
         plt.ylabel('Function value')
         if plot_grad:
-            plt.subplot(2,1,2)
-            plt.plot(x, grad_hist, **plot_opts)
+            axs.append(plt.subplot(2,1,2))
+            plt.plot(x, self.grad_hist, **plot_opts)
 
-        return len(func_hist) + start_iter, plt.gcf()
+        return axs
 
-    def plot_x_hist(self, prop=True, plot_opts={}, x_axis="iter"):
+    def plot_x_hist(self, prop=True, plot_opts={}, x_axis="iter", varlbls=None, slice=np.s_[:]):
         hist = np.array(self.hist)
         if x_axis == "iter":
             x = np.arange(0, hist.shape[0])
@@ -125,18 +217,26 @@ class optimisation_history (object):
 
         if prop:
             hist = hist / hist[-1, :]
-        plt.plot(x, hist)
+
+        for i, h in enumerate(hist.T[slice, :]):
+            plt.plot(x, h, label=varlbls[slice][i])
         plt.xlabel(xlabel)
 
 
-def create_timeout_function(f, start_time, timeout, verbose=False):
+class OptimisationTimeout(Exception):
+    pass
+
+
+def create_timeout_function(f, timeout, verbose=False):
+    start_time = time.time()
     def tf(x, *args):
         if (time.time() - start_time) < timeout:
             return f(x, *args)
         else:
             if verbose:
                 print("Timeout!")
-            return np.zeros(len(x))
+            # return np.zeros(len(x))
+            raise OptimisationTimeout("Optimisation has taken too long...")
 
     return tf
 
