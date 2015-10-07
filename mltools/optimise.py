@@ -69,8 +69,8 @@ def minimize(fun,
         r = opt.OptimizeResult(x=hist.hist[-1],
                                success=False,
                                message=message,
-                               fun=fun(hist.hist[-1]),
-                               jac=jac(hist.hist[-1]))
+                               fun=fun(hist.hist[-1], *args),
+                               jac=jac(hist.hist[-1], *args))
     print("")
     r.hist = hist
 
