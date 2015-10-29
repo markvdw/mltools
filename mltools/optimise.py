@@ -66,19 +66,76 @@ def minimize(fun,
             message = "Optimisation cancelled by keyboard after %fs" % (time.time() - start_time)
         else:
             raise NotImplementedError("Shouldn't happen!")
-        r = opt.OptimizeResult(x=hist.hist[-1],
+        r = opt.OptimizeResult(x=hist.hist.x_hist[-1],
                                success=False,
                                message=message,
-                               fun=fun(hist.hist[-1], *args),
-                               jac=jac(hist.hist[-1], *args))
+                               fun=fun(hist.hist.x_hist[-1], *args),
+                               jac=jac(hist.hist.x_hist[-1], *args))
     print("")
     r.hist = hist
 
     return r
 
 
+class OptimisationTrace(object):
+    def __init__(self, x_hist=None, iter_times=None):
+        if x_hist is None:
+            self.x_hist = []
+            self.iter_times = []
+        else:
+            if len(x_hist) == len(iter_times):
+                raise ValueError("Need times for iterations")
+            self.x_hist = x_hist
+            self.iter_times = iter_times
+
+        self.calc_funcs = []
+        self.calc_funcs_times = []
+        self.calc_grads = []
+        self.calc_grads_times = []
+
+    def iteration(self, x, t):
+        self.x_hist.append(x)
+        self.iter_times.append(t)
+
+    def add_calc(self, t, f=None, g=None):
+        if f is not None:
+            self.calc_funcs.append(f)
+            self.calc_funcs_times.append(t)
+
+        if g is not None:
+            self.calc_grads.append(np.mean(g**2.0)**0.5)
+            self.calc_grads_times.append(t)
+
+    def calc(self, f, g=None, iterations=None):
+        if iterations is None:
+            iterations = np.arange(0, len(self.iter_times))
+
+        calc_funcs = []
+        calc_funcs_times = []
+
+        search_start = 0
+        for i in iterations:
+            found, search_start = self._find_previous_calc(self.iter_times[i], self.calc_funcs_times, search_start)
+            if found:
+                calc_funcs.append(self.calc_funcs[search_start])
+            else:
+                calc_funcs.append(f(self.x_hist[i]))
+            calc_funcs_times.append(self.iter_times[i])
+
+        self.calc_funcs = calc_funcs
+        self.calc_funcs_times = calc_funcs_times
+
+    @staticmethod
+    def _find_previous_calc(req_time, times, start_iter):
+        while start_iter < len(times) and times[start_iter] < req_time:
+            if times[start_iter] == req_time:
+                return True, start_iter
+            start_iter += 1
+        return False, start_iter
+
+
 class optimisation_history (object):
-    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100, verbose=1, chaincallback=None, optscale=1):
+    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100, verbose=1, chaincallback=None, optscale=1, resume_trace=None):
         if chaincallback is not None:
             self.chaincallback = chaincallback
         else:
@@ -103,19 +160,18 @@ class optimisation_history (object):
         self.last_time = time.time()
 
         # Variables for final display
-        self.hist = []
-        self.times = []
-        self.times_abs = []
-        self.time_offset = time.time()
-        self.func_hist = []
-        self.grad_hist = []
+        if resume_trace is None:
+            self.hist = OptimisationTrace()
+            self.time_offset = time.time()
+        else:
+            self.hist = resume_trace
+            self.time_offset = resume_trace.iter_times[-1]
 
         print("Iter\tfunc\t\tgrad\t\titer/s")
 
     def iteration(self, f, force_print=False):
-        self.hist.append(f)
-        self.times.append(time.time() - self.time_offset)
-        self.times_abs.append(time.time())
+        reltime = time.time() - self.time_offset
+        self.hist.iteration(f, reltime)
         self.i += 1
 
         if self.verbose == 0:
@@ -137,6 +193,7 @@ class optimisation_history (object):
             self.nexti += int(self.print_gap)
             self.last_time = cur_time
 
+            self.hist.add_calc(reltime, fval, gval)
             self.chaincallback(self, f, fval, gval)
         else:
             # sys.stdout.write("%i\r" % self.i)
@@ -153,7 +210,7 @@ class optimisation_history (object):
 
     def resume(self):
         self.last_time = time.time()
-        self.time_offset = time.time() - self.times[-1]
+        self.time_offset = time.time() - self.hist.iter_times[-1]
         print("Iter\tfunc\t\tgrad\t\titer/s")
 
     def update_hist(self, update_grad=False):
@@ -180,13 +237,14 @@ class optimisation_history (object):
         linestyle = '-'
         axs = []
 
-        self.update_hist(plot_grad)
+        # self.update_hist(plot_grad)
+        self.hist.calc(lambda x: self.func(x, *self.func_args)*self.optscale)
 
         if x_axis == "iter":
-            x = np.arange(0, len(self.func_hist))
+            x = np.arange(0, len(self.hist.calc_funcs_times))
             xlabel = "Iteration"
         elif x_axis == "time":
-            x = np.array(self.times) - self.times[0]
+            x = self.hist.calc_funcs_times
             xlabel = "Time (s)"
         else:
             raise NotImplementedError("Don't know this x-axis type")
@@ -195,12 +253,12 @@ class optimisation_history (object):
             axs.append(plt.subplot(2,1,1))
         else:
             axs.append(plt.gca())
-        plt.plot(x, self.func_hist, linestyle, **plot_opts)
+        plt.plot(x, self.hist.calc_funcs, linestyle, **plot_opts)
         plt.xlabel(xlabel)
         plt.ylabel('Function value')
         if plot_grad:
             axs.append(plt.subplot(2,1,2))
-            plt.plot(x, self.grad_hist, **plot_opts)
+            plt.plot(self.hist.calc_grads_times, self.hist.calc_grads, **plot_opts)
 
         return axs
 
