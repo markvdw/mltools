@@ -127,9 +127,25 @@ class Mixture(ProbDistBase):
     def posterior_mixture(self, X):
         return np.exp(self.log_posterior_mixture(X))
 
+    def sample(self, N=1):
+        c = collections.Counter(self.wp.rvs(size=N))
+        samples = None
+        for mixture_idx in c:
+            s = self._distlist[mixture_idx].sample(c[mixture_idx])
+            if samples is None:
+                samples = s
+            else:
+                samples = np.vstack((s, samples))
+        random.shuffle(samples)
+        return samples
+
     @property
     def weights(self):
         return self._weights
+
+    @property
+    def wp(self):
+        return stats.rv_discrete(values=(range(0, len(self.weights)), self.weights))
 
 class MixtureOfGaussians(Mixture):
     def __init__(self, param_dist_list, weights):
@@ -142,19 +158,6 @@ class MixtureOfGaussians(Mixture):
         if len(dims) > 1:
             raise ValueError("Can not have mixtures of different dimension...")
         self.D = self._distlist[0].D
-        self.wp = stats.rv_discrete(values=(range(0, len(weights)), weights))
-
-    def sample(self, N=1):
-        c = collections.Counter(self.wp.rvs(size=N))
-        samples = None
-        for mixture_idx in c:
-            s = self._distlist[mixture_idx].sample(c[mixture_idx])
-            if samples is None:
-                samples = s
-            else:
-                samples = np.vstack((s, samples))
-        random.shuffle(samples)
-        return samples
 
     def plot(self, plot_hist=False, log=False, bounds=None):
         if self.D == 1:
@@ -295,13 +298,14 @@ Weights   : %s""" % (self.D, len(self._distlist), str(self._weights))
 
     
 class MultivariateNormal(ProbDistBase):
-    def __init__(self, mu, S, cS=None, iS=None, jitchol=False):
+    def __init__(self, mu, S=None, cS=None, iS=None, jitchol=False):
+        if S is None:
+            S = np.eye(len(mu))
+
         if (type(S) is int) or (type(S) is float):
-            self.D = 1
             self.S = np.array([[S]])
         else:
             self.S = np.array(S)
-            self.D = self.S.shape[0]
 
         if type(mu) is int or type(mu) is float:
             mu = np.array([mu])
@@ -362,6 +366,11 @@ class MultivariateNormal(ProbDistBase):
         self._S = value
         self._cS = linalg.cholesky(value)
         self._iS = linalg.inv(value)
+
+    @property
+    def D(self):
+        assert len(self.mu) == len(self.S), "Dimensions not consistent!"
+        return len(self.mu)
 
     @classmethod
     def random_init(cls, D=2, meanscale=1.0):
