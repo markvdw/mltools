@@ -23,25 +23,12 @@ def minimize(fun,
              hist=None,
              timeout=np.inf,
              optscale=1):
-    if type(x0) is optimisation_history:
-        # We can set x0 to a optimisation_history object to continue the optimisation! Currently only limited support.
-        hist = x0
-
+    if type(x0) is OptimisationTrace:
+        resume_trace = x0
         x0 = hist.hist[-1]
-        if fun is None:
-            fun = hist.func
-        jac = hist.grad
-        args = hist.func_args
-        hist.resume()
-        print "Resuming from optimisation_history object"
-    elif hist is None:
-        if jac is None:
-            histjac = lambda x: 0
-        else:
-            histjac = jac
-        hist = optimisation_history(fun, histjac, chaincallback=callback, optscale=optscale, args=args)
-    elif type(hist) is optimisation_history:
-        hist.resume()
+    else:
+        resume_trace = None
+    hist = optimisation_history(fun, histjac, chaincallback=callback, optscale=optscale, args=args, resume_trace=resume_trace)
 
     fun_timeout = create_timeout_function(fun, timeout)
 
@@ -66,11 +53,16 @@ def minimize(fun,
             message = "Optimisation cancelled by keyboard after %fs" % (time.time() - start_time)
         else:
             raise NotImplementedError("Shouldn't happen!")
-        r = opt.OptimizeResult(x=hist.hist.x_hist[-1],
+        if len(hist.hist.x_hist) > 0:
+            final_x = hist.hist.x_hist[-1]
+        else:
+            final_x = x0
+        hist.iteration(final_x, force_print=True)
+        r = opt.OptimizeResult(x=final_x,
                                success=False,
                                message=message,
-                               fun=fun(hist.hist.x_hist[-1], *args),
-                               jac=jac(hist.hist.x_hist[-1], *args))
+                               fun=fun(final_x, *args),
+                               jac=jac(final_x, *args))
     print("")
     r.hist = hist
 
