@@ -22,13 +22,9 @@ def minimize(fun,
              options=None,
              hist=None,
              timeout=np.inf,
-             optscale=1):
-    if type(x0) is OptimisationTrace:
-        resume_trace = x0
-        x0 = hist.hist[-1]
-    else:
-        resume_trace = None
-    hist = optimisation_history(fun, histjac, chaincallback=callback, optscale=optscale, args=args, resume_trace=resume_trace)
+             optscale=1,
+             resume_trace=None):
+    hist = optimisation_history(fun, jac, chaincallback=callback, optscale=optscale, args=args, resume_trace=resume_trace)
 
     fun_timeout = create_timeout_function(fun, timeout)
 
@@ -57,12 +53,15 @@ def minimize(fun,
             final_x = hist.hist.x_hist[-1]
         else:
             final_x = x0
-        hist.iteration(final_x, force_print=True)
         r = opt.OptimizeResult(x=final_x,
                                success=False,
                                message=message,
                                fun=fun(final_x, *args),
                                jac=jac(final_x, *args))
+
+    finalf = fun(r.x, *args)
+    finalg = jac(r.x, *args)
+    hist.hist.add_calc(time.time() - hist.time_offset, finalf * optscale, finalg * optscale)
     print("")
     r.hist = hist
 
@@ -157,7 +156,7 @@ class optimisation_history (object):
             self.time_offset = time.time()
         else:
             self.hist = resume_trace
-            self.time_offset = resume_trace.iter_times[-1]
+            self.time_offset = time.time() - resume_trace.iter_times[-1]
 
         print("Iter\tfunc\t\tgrad\t\titer/s")
 
