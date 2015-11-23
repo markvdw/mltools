@@ -158,7 +158,7 @@ class optimisation_history (object):
             self.hist = resume_trace
             self.time_offset = time.time() - resume_trace.iter_times[-1]
 
-        print("Iter\tfunc\t\tgrad\t\titer/s")
+        print("Iter\tfunc\t\tgrad\t\titer/s\tTimestamp")
 
     def iteration(self, f, force_print=False):
         reltime = time.time() - self.time_offset
@@ -176,7 +176,7 @@ class optimisation_history (object):
             gval = self.grad(f, *self.func_args) * self.optscale
             # print "%i\t%e\t%e\t%f" % (self.i, fval, np.sum(gval ** 2.0), time_per_iter)
             sys.stdout.write("\r")
-            sys.stdout.write("%i\t%e\t%e\t%f\t" % (self.i, fval, np.sqrt(np.mean(gval ** 2.0)), time_per_iter))
+            sys.stdout.write("%i\t%e\t%e\t%f\t%s\t" % (self.i, fval, np.sqrt(np.mean(gval ** 2.0)), time_per_iter, time.ctime()))
             sys.stdout.flush()
             # print("%i\t%e\t%e\t%f\r" % (self.i, fval, np.sqrt(np.sum(gval ** 2.0)), time_per_iter))
 
