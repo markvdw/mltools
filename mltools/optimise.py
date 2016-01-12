@@ -45,10 +45,10 @@ def minimize(fun,
     except (OptimisationTimeout, KeyboardInterrupt) as e:
         if type(e) is OptimisationTimeout:
             message = "Optimisation timeout after %fs" % (time.time() - start_time)
+            status = "timeout"
         elif type(e) is KeyboardInterrupt:
             message = "Optimisation cancelled by keyboard after %fs" % (time.time() - start_time)
-        else:
-            raise NotImplementedError("Shouldn't happen!")
+            status = "keyboard"
         if len(hist.hist.x_hist) > 0:
             final_x = hist.hist.x_hist[-1]
         else:
@@ -57,7 +57,8 @@ def minimize(fun,
                                success=False,
                                message=message,
                                fun=fun(final_x, *args),
-                               jac=jac(final_x, *args))
+                               jac=jac(final_x, *args),
+                               status=status)
 
     finalf = fun(r.x, *args)
     finalg = jac(r.x, *args)
@@ -158,7 +159,7 @@ class optimisation_history (object):
             self.hist = resume_trace
             self.time_offset = time.time() - resume_trace.iter_times[-1]
 
-        print("Iter\tfunc\t\tgrad\t\titer/s\tTimestamp")
+        print("Iter\tfunc\t\tgrad\t\titer/s\t\tTimestamp")
 
     def iteration(self, f, force_print=False):
         reltime = time.time() - self.time_offset
