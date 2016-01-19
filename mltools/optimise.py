@@ -371,13 +371,13 @@ def grad_pd(cg, fd):
     pd = (cg - fd) / fd * 100.
 
 
-def finite_difference(fun, x0, args=None, d=10**-4):
+def finite_difference(fun, x0, args=None, d=10 ** -4.0):
     """
     finite_difference
     Calculates the finite difference of fun() around x0. fun() can return an
     array of any dimension. Input/parameter can also be of any dimension.
     :param fun: Function to calculate the fd of.
-    :param x0: Location around which to calculate fd.
+    :param xt: Location around which to calculate fd.
     :param args: Extra arguments to fun.
     :param d: Tolerance
     :return: The finite difference.
@@ -389,17 +389,49 @@ def finite_difference(fun, x0, args=None, d=10**-4):
         f0 = fun(x0, *args)
         result_shape = f0.shape
 
-        fd = np.zeros(x0.shape + result_shape)
-        for idx in np.ndindex(fd.shape[:len(x0.shape)]):
-            bck = x0[idx]
-            x0[idx] += d
-            f1 = fun(x0, *args)
-            x0[idx] = bck
+        xt = x0.copy()
+        fd = np.zeros(xt.shape + result_shape)
+        for idx in np.ndindex(fd.shape[:len(xt.shape)]):
+            bck = xt[idx]
+            xt[idx] += d
+            f1 = fun(xt, *args)
+            xt[idx] = bck
             fd[idx] = (f1 - f0) / d
 
-        return fd
+        return fd.transpose(list(np.arange(len(xt.shape), len(fd.shape))) + list(np.arange(0, len(xt.shape))))
     else:
-        return (fun(x0 + d, *args) - fun(x0, *args)) / d
+        return (fun(xt + d, *args) - fun(xt, *args)) / d
+
+
+def check_grad(fun, grad, args=None, param=0, extra_args=(), d=10**-4.0, tol=2.0):
+    """
+    check_grad
+    An enchanced form of scipy.optimize.check_grad that works with vector & matrix inputs and outputs, multiple
+    input parameters and can automatically adjust the finite difference delta.
+    :param fun: Function to be finite differenced.
+    :param grad: Gradient function.
+    :param args: Arguments to fun an grad.
+    :param param: Which parameter needs to be finite differenced.
+    :param d: Delta or list of deltas to test.
+    :param tol: Finite difference tolerance (percent).
+    :return: DiffStats of the best result.
+    """
+    if type(d) is not list:
+        d = [d]
+
+    def fmod(x):
+        argmod = args[:param] + (x,) + args[param+1:] + extra_args
+        return fun(*argmod)
+
+    cg = grad(*(args + extra_args))
+    for curd in d:
+        fd = finite_difference(fmod, args[param], d=curd)
+
+        ds = diffstats(fd, cg)
+        if ds.percent_max < tol:
+            return ds
+
+    return ds
 
 
 def diffstats(fd, cg):
@@ -412,7 +444,11 @@ def diffstats(fd, cg):
     :param cg: Matrix B
     :return:
     """
-    pd = np.abs((fd - cg) / fd) * 100.
+    # pd = np.abs((fd - cg) / fd) * 100.0
+    with np.errstate(divide='ignore', invalid='ignore'):
+        pd = np.abs((fd - cg) / fd) * 100.0
+        pd[pd == np.inf] = 0
+        pd = np.nan_to_num(pd)
 
     percent_diff = np.nanmax(pd)
     max_diff = np.max(np.abs(fd - cg))
@@ -449,7 +485,7 @@ def gradient_descent(fun, x0, jac=None, args=None, tol=10**-4, maxiter=-1, callb
             raise ValueError('Must supply a value for the Jacobian (gradient)')
 
         options_default = {'max_eps': .1,
-                           'verbosity' :0,
+                           'verbosity': 0,
                            'maxiter': -1,
                            'streak': 10,
                            'momentum': 0.0,

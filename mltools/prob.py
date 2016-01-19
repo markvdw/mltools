@@ -98,6 +98,7 @@ class DummyImproperUniform(ProbDistBase):
     def pdf(self, X):
         return 1.0
 
+
 class Mixture(ProbDistBase):
     def __init__(self, distribution_list, weights):
         self._distlist = distribution_list
@@ -146,6 +147,7 @@ class Mixture(ProbDistBase):
     @property
     def wp(self):
         return stats.rv_discrete(values=(range(0, len(self.weights)), self.weights))
+
 
 class MixtureOfGaussians(Mixture):
     def __init__(self, param_dist_list, weights):
