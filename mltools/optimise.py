@@ -25,24 +25,24 @@ def minimize(fun,
              timeout=np.inf,
              optscale=1,
              resume_trace=None):
-    hist = OptimisationHistory(fun, jac, chaincallback=callback, optscale=optscale, args=args, resume_trace=resume_trace)
+    hist = OptimisationHistory(fun, jac, chaincallback=callback, args=args, resume_trace=resume_trace)
 
     # Modify the objective function to add some features
     timeout_fun = create_timeout_function(fun, timeout)
     wrapped_fun = lambda x, *args: timeout_fun(x, *args) / optscale
-    wrapped_jac = lambda x, *args: wrapped_jac(x, *args) / optscale
+    wrapped_jac = lambda x, *args: jac(x, *args) / optscale
 
     start_time = time.time()
     try:
         if method == "scg":
             if options is None:
                 options = {}
-            x, status = SCG(wrapped_fun, jac, x0, optargs=args, callback=hist.iteration, display=False, **options)
+            x, status = SCG(timeout_fun, jac, x0, optargs=args, callback=hist.iteration, display=False, **options)
             r = opt.OptimizeResult(x=x,
                                    success=False,
                                    message=status,
                                    fun=fun(x, *args),
-                                   jac=wrapped_jac(x, *args),
+                                   jac=jac(x, *args),
                                    status=status)
         else:
             r = opt.minimize(wrapped_fun,
@@ -77,7 +77,7 @@ def minimize(fun,
 
     finalf = fun(r.x, *args)
     finalg = jac(r.x, *args)
-    hist.hist.add_calc(time.time() - hist.time_offset, finalf * optscale, finalg * optscale)
+    hist.hist.add_calc(time.time() - hist.time_offset, finalf, finalg)
     print("")
     r.hist = hist
 
@@ -142,7 +142,7 @@ class OptimisationTrace(object):
 
 
 class OptimisationHistory (object):
-    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100, verbose=1, chaincallback=None, optscale=1, resume_trace=None):
+    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100, verbose=1, chaincallback=None, resume_trace=None):
         if chaincallback is not None:
             self.chaincallback = chaincallback
         else:
@@ -152,7 +152,6 @@ class OptimisationHistory (object):
         self.func = func
         self.grad = grad
         self.func_args = args
-        self.optscale = optscale
 
         # Parameters for the display during optimisation
         self.init_print_gap = print_gap
@@ -176,7 +175,7 @@ class OptimisationHistory (object):
 
         print("Iter\tfunc\t\tgrad\t\titer/s\t\tTimestamp")
 
-    def iteration(self, f, force_print=False, func_val=None, grad_val=None):
+    def iteration(self, f, force_print=False, fval=None, gval=None):
         reltime = time.time() - self.time_offset
         self.hist.iteration(f, reltime)
         self.i += 1
@@ -188,8 +187,11 @@ class OptimisationHistory (object):
             cur_time = time.time()
             time_per_iter = int(self.print_gap) / (cur_time - self.last_time)
 
-            fval = self.func(f, *self.func_args) * self.optscale
-            gval = self.grad(f, *self.func_args) * self.optscale
+            if fval is None:
+                fval = self.func(f, *self.func_args)
+
+            if gval is None:
+                gval = self.grad(f, *self.func_args)
             # print "%i\t%e\t%e\t%f" % (self.i, fval, np.sum(gval ** 2.0), time_per_iter)
             sys.stdout.write("\r")
             sys.stdout.write("%i\t%e\t%e\t%f\t%s\t" % (self.i, fval, np.sqrt(np.mean(gval ** 2.0)), time_per_iter, time.ctime()))
@@ -226,12 +228,12 @@ class OptimisationHistory (object):
         func_append = []
         grad_append = []
         for i in xrange(len(self.func_hist), len(self.hist)):
-            func_append.append(self.func(self.hist[i], *self.func_args) * self.optscale)
+            func_append.append(self.func(self.hist[i], *self.func_args))
 
         if update_grad:
             for i in xrange(len(self.grad_hist), len(self.hist)):
                 grad_append.append(
-                    np.mean((self.grad(self.hist[i], *self.func_args) * self.optscale)**2.0)**0.5
+                    np.mean((self.grad(self.hist[i], *self.func_args))**2.0)**0.5
                 )
 
         self.func_hist = np.hstack((self.func_hist, func_append))
@@ -245,7 +247,7 @@ class OptimisationHistory (object):
         axs = []
 
         # self.update_hist(plot_grad)
-        self.hist.calc(lambda x: self.func(x, *self.func_args)*self.optscale)
+        self.hist.calc(lambda x: self.func(x, *self.func_args))
 
         if x_axis == "iter":
             x = np.arange(0, len(self.hist.calc_funcs_times))

@@ -20,7 +20,7 @@ def exponents(fnow, current_grad):
     return np.sign(exps) * np.log10(exps).astype(int)
 
 
-def SCG(f, gradf, x, optargs=(), callback=None, maxiters=500, max_f_eval=np.inf, display=True, xtol=None, ftol=None, gtol=None):
+def SCG(f, gradf, x, optargs=(), callback=None, maxiter=500, max_f_eval=np.inf, display=True, xtol=None, ftol=None, gtol=None):
     """
     Optimisation through Scaled Conjugate Gradients (SCG)
 
@@ -61,14 +61,14 @@ def SCG(f, gradf, x, optargs=(), callback=None, maxiters=500, max_f_eval=np.inf,
 
     iteration = 0
 
-    len_maxiters = len(str(maxiters))
+    len_maxiters = len(str(maxiter))
     if display:
         print(' {0:{mi}s}   {1:11s}    {2:11s}    {3:11s}'.format("I", "F", "Scale", "|g|", mi=len_maxiters))
         exps = exponents(fnow, current_grad)
         p_iter = iteration
 
     # Main optimization loop.
-    while iteration < maxiters:
+    while iteration < maxiter:
 
         # Calculate first and second directional derivatives.
         if success:
@@ -112,7 +112,7 @@ def SCG(f, gradf, x, optargs=(), callback=None, maxiters=500, max_f_eval=np.inf,
 
         # Store relevant variables
         if callback is not None:
-            callback(x, func_val=fnow, grad_val=gradnew)
+            callback(x, fval=fnow, gval=gradnew)
 
         iteration += 1
         if display:
