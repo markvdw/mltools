@@ -27,26 +27,29 @@ def minimize(fun,
              resume_trace=None):
     hist = OptimisationHistory(fun, jac, chaincallback=callback, optscale=optscale, args=args, resume_trace=resume_trace)
 
-    fun_timeout = create_timeout_function(fun, timeout)
+    # Modify the objective function to add some features
+    timeout_fun = create_timeout_function(fun, timeout)
+    wrapped_fun = lambda x, *args: timeout_fun(x, *args) / optscale
+    wrapped_jac = lambda x, *args: wrapped_jac(x, *args) / optscale
 
     start_time = time.time()
     try:
         if method == "scg":
             if options is None:
                 options = {}
-            x, status = SCG(fun, jac, x0, optargs=args, callback=hist.iteration, display=False, **options)
+            x, status = SCG(wrapped_fun, jac, x0, optargs=args, callback=hist.iteration, display=False, **options)
             r = opt.OptimizeResult(x=x,
                                    success=False,
                                    message=status,
                                    fun=fun(x, *args),
-                                   jac=jac(x, *args),
+                                   jac=wrapped_jac(x, *args),
                                    status=status)
         else:
-            r = opt.minimize(fun_timeout,
+            r = opt.minimize(wrapped_fun,
                              x0,
                              args=args,
                              method=method,
-                             jac=jac,
+                             jac=wrapped_jac,
                              hess=hess,
                              hessp=hessp,
                              bounds=bounds,
