@@ -7,6 +7,8 @@ import scipy.optimize as opt
 
 import matplotlib.pyplot as plt
 
+from optimise_scg import SCG
+
 
 def minimize(fun,
              x0,
@@ -20,28 +22,38 @@ def minimize(fun,
              tol=None,
              callback=None,
              options=None,
-             hist=None,
              timeout=np.inf,
              optscale=1,
              resume_trace=None):
-    hist = optimisation_history(fun, jac, chaincallback=callback, optscale=optscale, args=args, resume_trace=resume_trace)
+    hist = OptimisationHistory(fun, jac, chaincallback=callback, optscale=optscale, args=args, resume_trace=resume_trace)
 
     fun_timeout = create_timeout_function(fun, timeout)
 
     start_time = time.time()
     try:
-        r = opt.minimize(fun_timeout,
-                         x0,
-                         args=args,
-                         method=method,
-                         jac=jac,
-                         hess=hess,
-                         hessp=hessp,
-                         bounds=bounds,
-                         constraints=constraints,
-                         tol=tol,
-                         callback=hist.iteration,
-                         options=options)
+        if method == "scg":
+            if options is None:
+                options = {}
+            x, status = SCG(fun, jac, x0, optargs=args, callback=hist.iteration, display=False, **options)
+            r = opt.OptimizeResult(x=x,
+                                   success=False,
+                                   message=status,
+                                   fun=fun(x, *args),
+                                   jac=jac(x, *args),
+                                   status=status)
+        else:
+            r = opt.minimize(fun_timeout,
+                             x0,
+                             args=args,
+                             method=method,
+                             jac=jac,
+                             hess=hess,
+                             hessp=hessp,
+                             bounds=bounds,
+                             constraints=constraints,
+                             tol=tol,
+                             callback=hist.iteration,
+                             options=options)
     except (OptimisationTimeout, KeyboardInterrupt) as e:
         if type(e) is OptimisationTimeout:
             message = "Optimisation timeout after %fs" % (time.time() - start_time)
@@ -126,7 +138,7 @@ class OptimisationTrace(object):
         return False, start_iter
 
 
-class optimisation_history (object):
+class OptimisationHistory (object):
     def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100, verbose=1, chaincallback=None, optscale=1, resume_trace=None):
         if chaincallback is not None:
             self.chaincallback = chaincallback
@@ -161,7 +173,7 @@ class optimisation_history (object):
 
         print("Iter\tfunc\t\tgrad\t\titer/s\t\tTimestamp")
 
-    def iteration(self, f, force_print=False):
+    def iteration(self, f, force_print=False, func_val=None, grad_val=None):
         reltime = time.time() - self.time_offset
         self.hist.iteration(f, reltime)
         self.i += 1
@@ -403,14 +415,14 @@ def finite_difference(fun, x0, args=None, d=10 ** -4.0):
         return (fun(xt + d, *args) - fun(xt, *args)) / d
 
 
-def check_grad(fun, grad, args=None, param=0, extra_args=(), d=10**-4.0, tol=2.0):
+def check_grad(fun, grad, x0=None, param=0, extra_args=(), d=10 ** -4.0, tol=2.0):
     """
     check_grad
     An enchanced form of scipy.optimize.check_grad that works with vector & matrix inputs and outputs, multiple
     input parameters and can automatically adjust the finite difference delta.
     :param fun: Function to be finite differenced.
     :param grad: Gradient function.
-    :param args: Arguments to fun an grad.
+    :param x0: Arguments to fun an grad.
     :param param: Which parameter needs to be finite differenced.
     :param d: Delta or list of deltas to test.
     :param tol: Finite difference tolerance (percent).
@@ -419,13 +431,16 @@ def check_grad(fun, grad, args=None, param=0, extra_args=(), d=10**-4.0, tol=2.0
     if type(d) is not list:
         d = [d]
 
+    if type(x0) is not tuple:
+        x0 = (x0,)
+
     def fmod(x):
-        argmod = args[:param] + (x,) + args[param+1:] + extra_args
+        argmod = x0[:param] + (x,) + x0[param + 1:] + extra_args
         return fun(*argmod)
 
-    cg = grad(*(args + extra_args))
+    cg = grad(*(x0 + extra_args))
     for curd in d:
-        fd = finite_difference(fmod, args[param], d=curd)
+        fd = finite_difference(fmod, x0[param], d=curd)
 
         ds = diffstats(fd, cg)
         if ds.percent_max < tol:

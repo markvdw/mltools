@@ -28,6 +28,4 @@ ds = mlopt.check_grad(f, g, x0=xt)
 print("Maximum percentage difference: %.2f%%" % ds.percent_max)
 
 # print mlopt.minimize(f, jac=g, x0=xt, method="l-bfgs-b")
-import mltools.optimise_scg as scg
-
-print scg.SCG(f, g, xt)
+r = mlopt.minimize(f, jac=g, x0=xt, method="scg")

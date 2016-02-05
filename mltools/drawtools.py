@@ -21,10 +21,23 @@ from mpl_toolkits.mplot3d import proj3d
 from matplotlib.backends.backend_pdf import PdfPages
 
 
+def plot_2d_func(fun, xmin=-10, xmax=10, ymin=-10, ymax=10, xstep=0.5, ystep=0.5):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    x = np.arange(xmin, xmax, xstep)
+    y = np.arange(ymin, ymax, ystep)
+    X, Y = np.meshgrid(x, y)
+    zs = np.array([fun(np.array([x,y])) for x,y in zip(np.ravel(X), np.ravel(Y))])
+    Z = zs.reshape(X.shape)
+    ax.plot_surface(X, Y, Z)
+    return fig
+
+
 def irreg_contour(x, y, z, xi, yi, **kwargs):
     zi = spinterpolate.griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
 
     plt.contour(xi, yi, zi, 15)
+
 
 class Arrow3D(FancyArrowPatch):
     def __init__(self, xs, ys, zs, *args, **kwargs):

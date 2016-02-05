@@ -20,7 +20,7 @@ def exponents(fnow, current_grad):
     return np.sign(exps) * np.log10(exps).astype(int)
 
 
-def SCG(f, gradf, x, optargs=(), maxiters=500, max_f_eval=np.inf, display=True, xtol=None, ftol=None, gtol=None):
+def SCG(f, gradf, x, optargs=(), callback=None, maxiters=500, max_f_eval=np.inf, display=True, xtol=None, ftol=None, gtol=None):
     """
     Optimisation through Scaled Conjugate Gradients (SCG)
 
@@ -58,8 +58,6 @@ def SCG(f, gradf, x, optargs=(), maxiters=500, max_f_eval=np.inf, display=True, 
     betamin = 1.0e-15 # Lower bound on scale.
     betamax = 1.0e15 # Upper bound on scale.
     status = "Not converged"
-
-    flog = [fold]
 
     iteration = 0
 
@@ -101,7 +99,6 @@ def SCG(f, gradf, x, optargs=(), maxiters=500, max_f_eval=np.inf, display=True, 
         if function_eval >= max_f_eval:
             status = "maximum number of function evaluations exceeded"
             break
-            return x, flog, function_eval, status
 
         Delta = 2.*(fnew - fold) / (alpha * mu)
         if Delta >= 0.:
@@ -114,7 +111,8 @@ def SCG(f, gradf, x, optargs=(), maxiters=500, max_f_eval=np.inf, display=True, 
             fnow = fold
 
         # Store relevant variables
-        flog.append(fnow) # Current function value
+        if callback is not None:
+            callback(x, func_val=fnow, grad_val=gradnew)
 
         iteration += 1
         if display:
@@ -135,7 +133,6 @@ def SCG(f, gradf, x, optargs=(), maxiters=500, max_f_eval=np.inf, display=True, 
             if (np.abs(fnew - fold) < ftol):
                 status = 'converged - relative reduction in objective'
                 break
-#                 return x, flog, function_eval, status
             elif (np.max(np.abs(alpha * d)) < xtol):
                 status = 'converged - relative stepsize'
                 break
@@ -150,7 +147,6 @@ def SCG(f, gradf, x, optargs=(), maxiters=500, max_f_eval=np.inf, display=True, 
                 if current_grad <= gtol:
                     status = 'converged - relative reduction in gradient'
                     break
-                    # return x, flog, function_eval, status
 
         # Adjust beta according to comparison ratio.
         if Delta < 0.25:
@@ -176,4 +172,4 @@ def SCG(f, gradf, x, optargs=(), maxiters=500, max_f_eval=np.inf, display=True, 
         print_out(len_maxiters, fnow, current_grad, beta, iteration)
         print("")
         print(status)
-    return x, flog, function_eval, status
+    return x, status
