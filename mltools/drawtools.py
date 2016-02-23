@@ -21,15 +21,22 @@ from mpl_toolkits.mplot3d import proj3d
 from matplotlib.backends.backend_pdf import PdfPages
 
 
-def plot_2d_func(fun, xmin=-10, xmax=10, ymin=-10, ymax=10, xstep=0.5, ystep=0.5):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    x = np.arange(xmin, xmax, xstep)
-    y = np.arange(ymin, ymax, ystep)
-    X, Y = np.meshgrid(x, y)
-    zs = np.array([fun(np.array([x,y])) for x,y in zip(np.ravel(X), np.ravel(Y))])
+def plot_2d_func(fun, xvals=None, yvals=None, type="contour", **kwargs):
+    fig = plt.gcf()
+    if xvals is None:
+        xvals = np.arange(-5, 5, 0.5)
+    if yvals is None:
+        yvals = np.arange(-5, 5, 0.5)
+    X, Y = np.meshgrid(xvals, yvals)
+    zs = np.array([fun(np.array([xvals, yvals])) for xvals, yvals in zip(np.ravel(X), np.ravel(Y))])
     Z = zs.reshape(X.shape)
-    ax.plot_surface(X, Y, Z)
+    if type == "surf":
+        ax = fig.add_subplot(111, projection='3d')
+        ax.plot_surface(X, Y, Z, **kwargs)
+    elif type == "contour":
+        plt.contour(X, Y, Z, **kwargs)
+    else:
+        raise NotImplementedError("Don't know about plot type '%s'..." % type)
     return fig
 
 
@@ -231,39 +238,57 @@ def GenEllipsoid(A, c=[0,0,0], divs=100):
     return (x, y, z)
 
 
-def DrawCovarianceContour(ax, A, c=[0,0]):
+def CalcEllipse(A, c=[0,0], scale=1.0):
+    B = linalg.inv(A)
+    a = B[0, 0]
+    b = B[0, 1]
+    c = B[1, 1]
+    cb2a = c - b**2.0/a
+    start = (2 / cb2a)**0.5
+    y = np.linspace(-start, start, 1000)
+    x = (2/a-cb2a*y**2.0/a)**0.5 + b/a*y
+    return x, -y
+
+def DrawCovarianceContour(A, c=[0,0], scale=2.0, ax=None, *args, **kwargs):
     """
-    Draw an ellipse for a Gaussian with *precision* matrix A.
+    Draw an ellipse for a Gaussian with *covariance* matrix A.
 
     Args:
         A: 2x2 matrix describing the ellipse.
         c: Centre of the ellipse.
     """
-    lab, l = linalg.eig(linalg.inv(A))
-
-    ell = mplot.patches.Ellipse(xy=c,
-                                width=np.sqrt(lab[0])*4,
-                                height=np.sqrt(lab[1])*4,
-                                angle=-np.arctan2(l[0,1], l[0,0]) / sp.constants.pi * 180)
-
-    ell.set_facecolor([1, 1, 1])
-
-    ax.add_artist(ell)
+    if ax is None:
+        ax = plt.gca()
+    if "color" not in kwargs:
+        kwargs["color"] = 'b'
+    x, y = CalcEllipse(A, c, scale)
+    ax.plot(x*scale, y*scale, *args, **kwargs)
+    ax.plot(-x*scale, -y*scale, *args, **kwargs)
 
 
-def DrawCovarianceEllipse(A, c=[0, 0, 0], ax=None):
+def DrawCovarianceEllipse(A, c=[0, 0, 0], ax=None, scale=1.0, **kwargs):
     """
     DrawCovarianceEllipse
-    A is *precision* matrix.
+    A is *covariance* matrix.
     """
 
-    x, y, z = GenEllipsoid(A, c)
+    x, y, z = GenEllipsoid(linalg.inv(A), c)
+    x *= scale
+    y *= scale
+    z *= scale
     if ax is None:
         fig = plt.gcf()
         ax = fig.add_subplot(111, projection='3d')
-    wframe = ax.plot_wireframe(x, y, z, rstride=4, cstride=4, color='b', alpha=0.2)
 
-    return ax
+    if 'rstride' not in kwargs:
+        kwargs['rstride'] = 8
+    if 'cstride' not in kwargs:
+        kwargs['cstride'] = 8
+    if 'alpha' not in kwargs:
+        kwargs['alpha'] = 0.2
+    wframe = ax.plot_wireframe(x, y, z, **kwargs)
+
+    return ax, wframe
 
 
 def plot_3d_points(P, ax=None, marker='x'):
@@ -287,7 +312,7 @@ if __name__ == "__main__":
     plt.clf()
     plt.plot(d[:, 0], d[:, 1], 'x')
     ax = plt.gca()
-    DrawCovarianceContour(ax, linalg.inv(A))
+    DrawCovarianceContour(ax, A)
 
     A = np.array([[1,0,0],[0,8,0],[0,0,1]])
     center = [0,0,0]
