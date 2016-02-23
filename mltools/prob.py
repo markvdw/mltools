@@ -1,9 +1,9 @@
-###############################################################################
-# prob.py
-# Some probability functions used for Machine Learning programming in Python.
-#
-# Mark van der Wilk (mv310@cam.ac.uk)
-###############################################################################
+"""
+prob.py
+Some probability functions used for Machine Learning programming in Python.
+
+Mark van der Wilk (mv310@cam.ac.uk)
+"""
 
 from __future__ import division
 
@@ -24,6 +24,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import linalg as mlin
 
 import drawtools as draw
+
 
 class ProbDistBase(object):
     """
@@ -48,10 +49,33 @@ class ProbDistBase(object):
         raise NotImplementedError()
 
     def entropy_mc(self, samples=1, s=None):
+        """
+        entropy_mc
+        Calculate the entropy of the distribution using Monte Carlo.
+        Args:
+            samples: Number of samples to use.
+            s: (optional) matrix of samples
+
+        Returns:
+        KL divergence value.
+        """
         samples = np.round(samples)
         if s is None:
             s = self.sample(samples)
         return -self.logjpdf(s[:samples, :]) / samples
+
+    def KL_mc(self, Q, samples=1, s=None):
+        """
+        Calculate the KL divergence with another distribution using Monte Carlo.
+        Args:
+            samples: Number of samples to use.
+
+        Returns:
+        Monte Carlo estimate of the KL divergence.
+        """
+        if s is None:
+            s = self.sample(samples)
+        return np.mean(self.logpdf(s) - Q.logpdf(s))
 
     def plot(self):
         raise NotImplementedError()
@@ -358,6 +382,10 @@ class MultivariateNormal(ProbDistBase):
             plt.plot(s[:, 0], s[:, 1], s[:, 2], 'x')
         else:
             plt.imshow(self.S, interpolation="None")
+
+    def KL(self, Q):
+        dmu = Q.mu - self.mu
+        return 0.5 * (np.trace(linalg.solve(Q.S, self.S)) + np.dot(dmu.flatten(), linalg.solve(Q.S, dmu.flatten())) - self.D + linalg.slogdet(Q.S)[1] - linalg.slogdet(self.S)[1])
 
     @property
     def S(self):
