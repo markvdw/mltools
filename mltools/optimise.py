@@ -260,7 +260,7 @@ class OptimisationHistory (object):
         plt.xlabel(xlabel)
 
 
-class OptimisationTimeout(Exception):
+class OptimisationTimeout(KeyboardInterrupt):
     pass
 
 
