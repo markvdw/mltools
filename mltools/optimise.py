@@ -23,9 +23,8 @@ def minimize(fun,
              callback=None,
              options=None,
              timeout=np.inf,
-             optscale=1,
-             resume_trace=None):
-    hist = OptimisationHistory(fun, jac, chaincallback=callback, args=args, resume_trace=resume_trace)
+             optscale=1):
+    hist = OptimisationHistory(fun, jac, chaincallback=callback, args=args)
 
     # Modify the objective function to add some features
     timeout_fun = create_timeout_function(fun, timeout)
@@ -64,8 +63,8 @@ def minimize(fun,
         elif type(e) is KeyboardInterrupt:
             message = "Optimisation cancelled by keyboard after %fs" % (time.time() - start_time)
             status = "keyboard"
-        if len(hist.hist.x_hist) > 0:
-            final_x = hist.hist.x_hist[-1]
+        if len(hist.trace.x_hist) > 0:
+            final_x = hist.trace.x_hist[-1]
         else:
             final_x = x0
         r = opt.OptimizeResult(x=final_x,
@@ -77,7 +76,7 @@ def minimize(fun,
 
     finalf = fun(r.x, *args)
     finalg = jac(r.x, *args)
-    hist.hist.add_calc(time.time() - hist.time_offset, finalf, finalg)
+    hist.trace.add_calc(time.time() - hist.time_offset, finalf, finalg)
     print("")
     r.hist = hist
 
@@ -95,23 +94,27 @@ class OptimisationTrace(object):
             self.x_hist = x_hist
             self.iter_times = iter_times
 
-        self.calc_funcs = []
-        self.calc_funcs_times = []
-        self.calc_grads = []
-        self.calc_grads_times = []
+        self.fvals = []
+        self.fval_times = []
+        self.fval_iters = []
+        self.gvals = []
+        self.gval_times = []
+        self.gval_iters = []
 
     def iteration(self, x, t):
-        self.x_hist.append(x)
+        self.x_hist.append(x.copy())
         self.iter_times.append(t)
 
-    def add_calc(self, t, f=None, g=None):
+    def add_calc(self, time, iter, f=None, g=None):
         if f is not None:
-            self.calc_funcs.append(f)
-            self.calc_funcs_times.append(t)
+            self.fvals.append(f)
+            self.fval_times.append(time)
+            self.fval_iters.append(iter)
 
         if g is not None:
-            self.calc_grads.append(np.mean(g**2.0)**0.5)
-            self.calc_grads_times.append(t)
+            self.gvals.append(np.mean(g ** 2.0) ** 0.5)
+            self.gval_times.append(time)
+            self.gval_iters.append(iter)
 
     def calc(self, f, g=None, iterations=None):
         if iterations is None:
@@ -122,15 +125,15 @@ class OptimisationTrace(object):
 
         search_start = 0
         for i in iterations:
-            found, search_start = self._find_previous_calc(self.iter_times[i], self.calc_funcs_times, search_start)
+            found, search_start = self._find_previous_calc(self.iter_times[i], self.fval_times, search_start)
             if found:
-                calc_funcs.append(self.calc_funcs[search_start])
+                calc_funcs.append(self.fvals[search_start])
             else:
                 calc_funcs.append(f(self.x_hist[i]))
             calc_funcs_times.append(self.iter_times[i])
 
-        self.calc_funcs = calc_funcs
-        self.calc_funcs_times = calc_funcs_times
+        self.fvals = calc_funcs
+        self.fval_times = calc_funcs_times
 
     @staticmethod
     def _find_previous_calc(req_time, times, start_iter):
@@ -142,7 +145,7 @@ class OptimisationTrace(object):
 
 
 class OptimisationHistory (object):
-    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100, verbose=1, chaincallback=None, resume_trace=None):
+    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100, verbose=1, chaincallback=None):
         if chaincallback is not None:
             self.chaincallback = chaincallback
         else:
@@ -165,19 +168,22 @@ class OptimisationHistory (object):
         self.print_gap = self.init_print_gap
         self.last_time = time.time()
 
-        # Variables for final display
-        if resume_trace is None:
-            self.hist = OptimisationTrace()
-            self.time_offset = time.time()
-        else:
-            self.hist = resume_trace
-            self.time_offset = time.time() - resume_trace.iter_times[-1]
+        self.trace = OptimisationTrace()
+        self.time_offset = time.time()
 
         print("Iter\tfunc\t\tgrad\t\titer/s\t\tTimestamp")
 
-    def iteration(self, f, force_print=False, fval=None, gval=None):
+    def _calc_obj(self, x):
+        if self.grad == True:
+            fval, gval = self.func(x, *self.func_args)
+        else:
+            fval = self.func(x, *self.func_args)
+            gval = self.grad(x, *self.func_args)
+        return fval, gval
+
+    def iteration(self, f, force_print=False):
         reltime = time.time() - self.time_offset
-        self.hist.iteration(f, reltime)
+        self.trace.iteration(f, reltime)
         self.i += 1
 
         if self.verbose == 0:
@@ -187,11 +193,8 @@ class OptimisationHistory (object):
             cur_time = time.time()
             time_per_iter = int(self.print_gap) / (cur_time - self.last_time)
 
-            if fval is None:
-                fval = self.func(f, *self.func_args)
+            fval, gval = self._calc_obj(f)
 
-            if gval is None:
-                gval = self.grad(f, *self.func_args)
             # print "%i\t%e\t%e\t%f" % (self.i, fval, np.sum(gval ** 2.0), time_per_iter)
             sys.stdout.write("\r")
             sys.stdout.write("%i\t%e\t%e\t%f\t%s\t" % (self.i, fval, np.sqrt(np.mean(gval ** 2.0)), time_per_iter, time.ctime()))
@@ -202,58 +205,25 @@ class OptimisationHistory (object):
             self.nexti += int(self.print_gap)
             self.last_time = cur_time
 
-            self.hist.add_calc(reltime, fval, gval)
+            self.trace.add_calc(reltime, self.i, fval, gval)
             self.chaincallback(self, f, fval, gval)
         else:
             # sys.stdout.write("%i\r" % self.i)
             # sys.stdout.flush()
             pass
 
-    # def reset(self):
-    #     self.i = 0
-    #     self.nexti = self.init_print_gap
-    #     self.print_gap = self.init_print_gap
-    #     self.hist = []
-    #     self.time_offset = 0
-    #     self.resume()
-
-    def resume(self):
-        self.last_time = time.time()
-        self.time_offset = time.time() - self.hist.iter_times[-1]
-        print("Iter\tfunc\t\tgrad\t\titer/s")
-
-    def update_hist(self, update_grad=False):
-        # We only store the parameters at each iteration, not the actual objective function value. So now we need to
-        # recompute it.
-        func_append = []
-        grad_append = []
-        for i in xrange(len(self.func_hist), len(self.hist)):
-            func_append.append(self.func(self.hist[i], *self.func_args))
-
-        if update_grad:
-            for i in xrange(len(self.grad_hist), len(self.hist)):
-                grad_append.append(
-                    np.mean((self.grad(self.hist[i], *self.func_args))**2.0)**0.5
-                )
-
-        self.func_hist = np.hstack((self.func_hist, func_append))
-        assert len(self.hist) == len(self.func_hist)
-        if update_grad:
-            self.grad_hist = np.hstack((self.grad_hist, grad_append))
-            assert len(self.hist) == len(self.grad_hist)
-
     def plot_f_hist(self, plot_grad=False, plot_opts={}, x_axis="iter"):
         linestyle = '-'
         axs = []
 
         # self.update_hist(plot_grad)
-        self.hist.calc(lambda x: self.func(x, *self.func_args))
+        self.trace.calc(lambda x: self.func(x, *self.func_args))
 
         if x_axis == "iter":
-            x = np.arange(0, len(self.hist.calc_funcs_times))
+            x = np.arange(0, len(self.trace.fval_times))
             xlabel = "Iteration"
         elif x_axis == "time":
-            x = self.hist.calc_funcs_times
+            x = self.trace.fval_times
             xlabel = "Time (s)"
         else:
             raise NotImplementedError("Don't know this x-axis type")
@@ -262,17 +232,17 @@ class OptimisationHistory (object):
             axs.append(plt.subplot(2,1,1))
         else:
             axs.append(plt.gca())
-        plt.plot(x, self.hist.calc_funcs, linestyle, **plot_opts)
+        plt.plot(x, self.trace.fvals, linestyle, **plot_opts)
         plt.xlabel(xlabel)
         plt.ylabel('Function value')
         if plot_grad:
             axs.append(plt.subplot(2,1,2))
-            plt.plot(self.hist.calc_grads_times, self.hist.calc_grads, **plot_opts)
+            plt.plot(self.trace.gval_times, self.trace.gvals, **plot_opts)
 
         return axs
 
     def plot_x_hist(self, prop=True, plot_opts={}, x_axis="iter", varlbls=None, slice=np.s_[:]):
-        hist = np.array(self.hist)
+        hist = np.array(self.trace)
         if x_axis == "iter":
             x = np.arange(0, hist.shape[0])
             xlabel = "iteration"
