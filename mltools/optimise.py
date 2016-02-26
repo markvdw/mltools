@@ -84,7 +84,7 @@ def minimize(fun,
 
 
 class OptimisationTrace(object):
-    def __init__(self, x_hist=None, iter_times=None):
+    def __init__(self, store_only_firstlast_x=False, x_hist=None, iter_times=None):
         if x_hist is None:
             self.x_hist = []
             self.iter_times = []
@@ -94,6 +94,8 @@ class OptimisationTrace(object):
             self.x_hist = x_hist
             self.iter_times = iter_times
 
+        self._store_only_firstlast_x = store_only_firstlast_x
+
         self.fvals = []
         self.fval_times = []
         self.fval_iters = []
@@ -102,7 +104,13 @@ class OptimisationTrace(object):
         self.gval_iters = []
 
     def iteration(self, x, t):
-        self.x_hist.append(x.copy())
+        if self._store_only_firstlast_x:
+            if len(self.x_hist) <= 1:
+                self.x_hist.append(x.copy())
+            else:
+                self.x_hist[1] = x.copy()
+        else:
+            self.x_hist.append(x.copy())
         self.iter_times.append(t)
 
     def add_calc(self, time, iter, f=None, g=None):
@@ -145,7 +153,7 @@ class OptimisationTrace(object):
 
 
 class OptimisationHistory (object):
-    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100, verbose=1, chaincallback=None):
+    def __init__(self, func, grad, args=(), print_gap=1.0, print_growth=1.2, print_max=100, verbose=1, chaincallback=None, store_only_firstlast_x=True, **kwargs):
         if chaincallback is not None:
             self.chaincallback = chaincallback
         else:
@@ -168,7 +176,7 @@ class OptimisationHistory (object):
         self.print_gap = self.init_print_gap
         self.last_time = time.time()
 
-        self.trace = OptimisationTrace()
+        self.trace = OptimisationTrace(store_only_firstlast_x)
         self.time_offset = time.time()
 
         print("Iter\tfunc\t\tgrad\t\titer/s\t\tTimestamp")
